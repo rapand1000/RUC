@@ -17,6 +17,8 @@ erDiagram
         string erfaring
         string interesse_foer
         int kendskab
+        int ansvar_foer
+        int svaert_foer
         string desc
     }
     Valg {
@@ -32,6 +34,7 @@ erDiagram
         int sikkerhed
         string styret
         string ansvar
+        int ansvar_foelt
     }
     Slutninger {
         string player
@@ -42,6 +45,9 @@ erDiagram
         int synsaendring
         string interesse_efter
         string overrasket
+        int ansvar_efter
+        int svaert_efter
+        int realisme
     }
 ```
 
@@ -58,6 +64,8 @@ erDiagram
 | erfaring | Nej | Erfaring fra pleje/sundhed | Erfaring fra pleje eller sundhed? |
 | interesse_foer | Måske | Job i plejen, før spillet | Overvejer du et job i plejen? |
 | kendskab | 2 | 1-5 | Hvor godt kender du plejepersonalets hverdag? |
+| ansvar_foer | 3 | 1-5, **før** | Hvor stort ansvar har en sygeplejerske i løbet af en vagt? |
+| svaert_foer | 2 | 1-5, **før** | Hvor svært er det at træffe beslutninger som sygeplejerske? |
 
 ## Fanebladet Valg (én række pr. beslutning)
 
@@ -74,6 +82,7 @@ erDiagram
 | stress | 4 | "Hvor presset følte du dig?" 1-5 |
 | sikkerhed | 2 | "Hvor sikker var du på dit valg?" 1-5 |
 | styret | Tiden | "Hvad styrede dit valg?" Patientens sikkerhed / Tiden / Reglerne / Mavefornemmelse |
+| ansvar_foelt | 4 | "Hvor meget føltes beslutningen som dit ansvar?" 1-5 |
 | ansvar | Systemet | Kun ved game over: "Hvem havde ansvaret?" Mig / Kollegaen / Systemet / Ledelsen |
 
 ## Fanebladet Slutninger (én række pr. gennemført vagt)
@@ -87,11 +96,21 @@ erDiagram
 | synsaendring | 4 | "Har spillet ændret dit syn på plejepersonalets ansvar?" 1-5 |
 | interesse_efter | Ja | "Overvejer du nu et job i plejen?" |
 | overrasket | | "Hvad overraskede dig mest?" Fritekst, frivillig |
+| ansvar_efter | 4 | Samme spørgsmål som `ansvar_foer`, **efter** vagten |
+| svaert_efter | 4 | Samme spørgsmål som `svaert_foer`, **efter** vagten |
+| realisme | 4 | "Hvor virkelig føltes vagten?" 1-5 |
 
 ## Fra data til indsigt (resultatsiden)
 
-| Forskningsspørgsmål | Måles med | Vises i |
+**Forskningsspørgsmål:** Hvordan kan interaktive simulationer påvirke unges oplevelse af ansvar og beslutningstagning i sygeplejefaget?
+
+| Delspørgsmål | Måles med | Vises i |
 |---|---|---|
+| Ændrer spillet, hvor stort ansvaret opleves? | `ansvar_efter` − `ansvar_foer` pr. spiller | [R11] |
+| Ændrer spillet, hvor svært det opleves at beslutte? | `svaert_efter` − `svaert_foer` pr. spiller | [R11] |
+| Hvor meget føles beslutningerne som spillerens eget ansvar? | `ansvar_foelt` pr. runde | [R11] |
+| Føltes simulationen troværdig? | `realisme` | [R11] |
+| Er der forskel på alder og erfaring? | `age`, `erfaring` | [R11] |
 | Vælger unge systemets vej (A) eller genvejen (B)? | `choice` pr. `round` | [R5] |
 | Hvor presset føles beslutningen, og hvor sikker er man? | `stress`, `sikkerhed`, `ms` | [R8] |
 | Hvor mange træffer hurtige og usikre valg? | `ms` < 5000 og `sikkerhed` ≤ 2 | [R8] |
@@ -106,4 +125,3 @@ erDiagram
 - Frivilligt og anonymt. Kaldenavnet vælges af spilleren.
 - Tekst kortes til 300 tegn, og formler i tekst neutraliseres ([G5]).
 - Resultatsiden kræver en hemmelig nøgle i linket ([G2], [G6]). Nøglen står **ikke** i dette repo.
-- Top 5 viser kun kaldenavn og tal ([G7]).

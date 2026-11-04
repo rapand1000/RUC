@@ -11,36 +11,36 @@ Klik på referencen for at hoppe direkte til linjen på GitHub, eller søg efter
 
 | Ref | Del | Navne i koden | Hvad sker der |
 |---|---|---|---|
-| [S1](../src/index.html#L26) | **Design-tokens og tema** (linje 26) | `:root`, `--mon-*` | Alle farver ligger som CSS-variabler ét sted. Resten af CSS'en bruger kun variablerne, så tema og lys/mørk tilstand styres centralt. |
-| [S2](../src/index.html#L56) | **Topbjælke** (linje 56) | `.top`, `.chip` | Titel og små "chips" med runde, klokkeslæt, forsøg og spiller. |
-| [S3](../src/index.html#L66) | **Top 5-ticker** (linje 66) | `.ticker`, `.tk-track`, `@keyframes tk` | 30 px bjælke, der ruller fra højre mod venstre. Indholdet ligger to gange, og animationen flytter det -50 %, så rulningen ser uendelig ud. Stopper ved mus-over og ved "reduceret bevægelse". |
-| [S4](../src/index.html#L83) | **Nedtælling** (linje 83) | `#timer`, `.on`, `.low` | Vandret bjælke, der skrumper på 15 sekunder og bliver rød til sidst. |
-| [S5](../src/index.html#L90) | **De tre rammer** (linje 90) | `main#game`, `@media` | Grid med monitor, kort og tegneserie. Under 1100 px flyttes tegneserien ned, under 760 px stables alt (mobil). |
-| [S6](../src/index.html#L120) | **Kortet** (linje 120) | `.card` | Info-, stress-, feedback-, game over- og slutkort. |
-| [S7](../src/index.html#L135) | **Knapper** (linje 135) | `.actions`, `.key` | De fire valg og de store "videre"-knapper. |
-| [S8](../src/index.html#L164) | **Patientnavne og spørgsmål** (linje 164) | `.pt`, `.opts`, `.side` | Farvede "piller" med stuenummer, knaprækker til forskningsspørgsmål og tegneserie-kolonnen. |
-| [S9](../src/index.html#L192) | **Profilformular** (linje 192) | `.field` | Felterne i profilen før vagten. |
-| [H1](../src/index.html#L228) | **Sidestruktur** (linje 228) | `#card`, `#actions`, `#ward`, `#side` | Tomme beholdere, som JavaScript fylder. Elementer findes med `$("id")`. |
-| [H2](../src/index.html#L242) | **Ticker-HTML** (linje 242) | `#ticker`, `#tkTrack` | Fyldes af `renderTicker()` [K13]. |
-| [H3](../src/index.html#L247) | **De tre rammer** (linje 247) | `#monitor`, `#card`, `#side` | Monitor [K10], kort [K14] og tegneserie [K12]. |
-| [K1](../src/index.html#L278) | **Grundopsætning** (linje 278) | `SECONDS`, `PATIENTS`, `ROUNDS` | 15 sekunder pr. valg, de fire patienter og de fem runder. |
-| [K2](../src/index.html#L289) | **Historietræet** (linje 289) | `N` | Spillets indhold: 31 noder. Node-ID'et er vejen hertil (`R3-AB`). Hver node har patienter `f`, `alarm`, `title`, `sit`, fire valg `c` (A, B, X1, X2) og feedback `fb`. Se [historier.md](historier.md). |
-| [K3](../src/index.html#L397) | **Slutprofiler og slutninger** (linje 397) | `PROFILES`, `ENDINGS` | Profil efter antal A-valg (0-5) og 32 slutninger med hele vejen som nøgle, fx `AABBA`. |
-| [K4](../src/index.html#L434) | **Tegneserie-manuskript** (linje 434) | `COMICS` | Tre paneler pr. node: `[venstre, højre, hvem taler, taleboble]`. |
-| [K5](../src/index.html#L472) | **Farver, figurer, ur og svar** (linje 472) | `PCOL`, `PEOPLE`, `ANCHOR`, `DRIVERS`, `BLAME` | Patientfarver, figurer, ur-ankre i minutter efter midnat (420 = 07.00) og svarmuligheder. |
-| [K6](../src/index.html#L480) | **Tilstand** (linje 480) | `player`, `profile`, `S` | Anonymt spiller-ID og profil i `localStorage`. `S` holder hele vagtens tilstand, bl.a. `S.phase`, `S.node`, `S.path`. |
-| [K7](../src/index.html#L491) | **Datalaget** (linje 491) | `Data.save()`, `google.script.run` | Broen fra browser til server. Kalder `logRow()` [G5]. Fejl ignoreres bevidst, så spillet aldrig går i stå. |
-| [K8](../src/index.html#L494) | **Top 5 og ventende række** (linje 494) | `loadHS()`, `flushPending()` | Henter top 5 fra `getHighscore()` [G7]. Et game over-valg gemmes først, når "hvem havde ansvaret?" er besvaret. |
-| [K9](../src/index.html#L509) | **Ny spiller / nyt spil** (linje 509) | `newPlayer()`, `newGame()` | Nyt anonymt ID og tom profil, eller nyt vagt-ID. |
-| [K10](../src/index.html#L519) | **Patientmonitoren** (linje 519) | `renderWard()`, `setVitals()`, `ecgTick()`, `beat()` | Fire stuer, puls og stress. EKG tegnes på `<canvas>` med `requestAnimationFrame`, hastigheden følger pulsen. |
-| [K11](../src/index.html#L564) | **Hjælpefunktioner** (linje 564) | `esc()`, `hl()`, `clockNow()`, `opts()`, `bindOpts()` | `esc()` beskytter mod HTML i tekst. `hl()` gør patientnavne til farvede piller. `clockNow()` regner klokken ud (06.50 + 5 min pr. kort). |
-| [K12](../src/index.html#L606) | **Tegneserien som SVG** (linje 606) | `person()`, `patientBed()`, `prop()`, `panel()`, `wrap()` | Figurer tegnes direkte som SVG. Ingen billedfiler. Talebobler ombrydes til højst 3 linjer. |
-| [K13](../src/index.html#L656) | **Sidekolonne og ticker** (linje 656) | `renderSide()`, `renderTicker()` | Viser tegneserien for den aktuelle node og bygger top 5. |
-| [K14](../src/index.html#L672) | **render() – tilstandsmaskinen** (linje 672) | `render()`, `goNode()` | Tegner skærmen ud fra `S.phase`: profile → start → info → stress → feedback/over → … → end. |
-| [K15](../src/index.html#L837) | **Nedtællingen** (linje 837) | `startTimer()`, `stopTimer()` | Måler svartid i ms og hæver pulsen. Tiden ude = `choose("timeout")` = game over. |
-| [K16](../src/index.html#L855) | **Et valg** (linje 855) | `row()`, `choose()` | Bygger én datarække. X1/X2/timeout = game over, A/B = feedback. |
-| [K17](../src/index.html#L878) | **Bedømmelse og næste node** (linje 878) | `rate()` | Tjekker at de tre spørgsmål er besvaret, gemmer og går videre til `R{runde+1}-{vej}` eller slutskærmen. |
-| [K18](../src/index.html#L893) | **Små hændelser og opstart** (linje 893) | `addEventListener`, `setInterval(loadHS)` | Mus over navn lyser stuen op, tasterne 1-4 vælger, klik på kaldenavn skifter profil. Første `render()` og top 5 hvert minut. |
+| [S1](../src/index.html#L28) | **Design-tokens og tema** (linje 28) | `:root`, `--mon-*` | Alle farver ligger som CSS-variabler ét sted. Resten af CSS'en bruger kun variablerne, så tema og lys/mørk tilstand styres centralt. |
+| [S2](../src/index.html#L57) | **Topbjælke** (linje 57) | `.top`, `.chip` | Titel og små "chips" med runde, klokkeslæt, forsøg og spiller. |
+| [S3](../src/index.html#L67) | **Tidslinje** (linje 67) | `.timeline`, `.tl-stop` | Vagten 06.50-15.00 som en vandret linje. Fyldet viser, hvor langt dagen er nået, og en prik pr. runde farves efter valget (A/B). |
+| [S4](../src/index.html#L80) | **Nedtælling (tæller)** (linje 80) | `.count`, `.low` | En stor tæller med sekunder tilbage ved siden af situationen, i stedet for en bjælke. Rød de sidste 5 sekunder. På mobil klæber den øverst. |
+| [S5](../src/index.html#L92) | **Én kolonne** (linje 92) | `.stage` | Rammerne ligger oppefra og ned, som i gruppens skitse: tegneserie, situation + tæller, svar, tidslinje, patientovervågning. Samme rækkefølge på pc og mobil. |
+| [S6](../src/index.html#L122) | **Kortet** (linje 122) | `.card` | Info-, stress-, feedback-, game over- og slutkort. |
+| [S7](../src/index.html#L137) | **Knapper** (linje 137) | `.actions`, `.key` | De fire valg og de store "videre"-knapper. |
+| [S8](../src/index.html#L166) | **Patientnavne, spørgsmål, tegneserie** (linje 166) | `.pt`, `.opts`, `.strip` | Farvede "piller" med stuenummer, knaprækker til forskningsspørgsmål og tegneserien som tre paneler side om side (vandret rulning på mobil). |
+| [S9](../src/index.html#L186) | **Profilformular** (linje 186) | `.field` | Felterne i profilen før vagten. |
+| [H1](../src/index.html#L222) | **Sidestruktur** (linje 222) | `#side`, `#card`, `#count`, `#actions`, `#timeline`, `#ward` | Tomme beholdere, som JavaScript fylder. Elementer findes med `$("id")`. |
+| [H2](../src/index.html#L236) | **Spillets rammer** (linje 236) | `main.stage`, `.situ` | De fem rammer i rækkefølge: billede [K12], situation + tæller [K14] [K15], svar, tidslinje [K13], overvågning [K10]. |
+| [H3](../src/index.html#L250) | **Patientovervågning** (linje 250) | `#monitor`, `#ecg`, `#hr`, `#stressV`, `#ward` | EKG og puls, stressindikator og de fire stuer med patientinfo. |
+| [K1](../src/index.html#L273) | **Grundopsætning** (linje 273) | `SECONDS`, `PATIENTS`, `ROUNDS` | 15 sekunder pr. valg, de fire patienter og de fem runder. |
+| [K2](../src/index.html#L284) | **Historietræet** (linje 284) | `N` | Spillets indhold: 31 noder. Node-ID'et er vejen hertil (`R3-AB`). Hver node har patienter `f`, `alarm`, `title`, `sit`, fire valg `c` (A, B, X1, X2) og feedback `fb`. Se [historier.md](historier.md). |
+| [K3](../src/index.html#L392) | **Slutprofiler og slutninger** (linje 392) | `PROFILES`, `ENDINGS` | Profil efter antal A-valg (0-5) og 32 slutninger med hele vejen som nøgle, fx `AABBA`. |
+| [K4](../src/index.html#L429) | **Tegneserie-manuskript** (linje 429) | `COMICS` | Tre paneler pr. node: `[venstre, højre, hvem taler, taleboble]`. |
+| [K5](../src/index.html#L467) | **Farver, figurer, ur og spørgsmål** (linje 467) | `PCOL`, `PEOPLE`, `ANCHOR`, `DRIVERS`, `BLAME`, `PREPOST` | Patientfarver, figurer, ur-ankre i minutter efter midnat (420 = 07.00), svarmuligheder og før/efter-spørgsmålene (samme ordlyd før og efter). |
+| [K6](../src/index.html#L481) | **Tilstand** (linje 481) | `player`, `profile`, `S` | Anonymt spiller-ID og profil i `localStorage`. `S` holder hele vagtens tilstand, bl.a. `S.phase`, `S.node`, `S.path`. |
+| [K7](../src/index.html#L492) | **Datalaget** (linje 492) | `Data.save()`, `google.script.run` | Broen fra browser til server. Kalder `logRow()` [G5]. Fejl ignoreres bevidst, så spillet aldrig går i stå. |
+| [K8](../src/index.html#L495) | **Ventende række** (linje 495) | `flushPending()` | Et game over-valg gemmes først, når "hvem havde ansvaret?" er besvaret, eller når siden lukkes. |
+| [K9](../src/index.html#L505) | **Ny spiller / nyt spil** (linje 505) | `newPlayer()`, `newGame()` | Nyt anonymt ID og tom profil, eller nyt vagt-ID. |
+| [K10](../src/index.html#L515) | **Patientovervågningen** (linje 515) | `renderWard()`, `setVitals()`, `ecgTick()`, `beat()` | Fire stuer, puls og stressindikator nederst. EKG tegnes på `<canvas>` med `requestAnimationFrame`, hastigheden følger pulsen. |
+| [K11](../src/index.html#L560) | **Hjælpefunktioner** (linje 560) | `esc()`, `hl()`, `clockNow()`, `opts()`, `bindOpts()` | `esc()` beskytter mod HTML i tekst. `hl()` gør patientnavne til farvede piller. `clockNow()` regner klokken ud (06.50 + 5 min pr. kort). |
+| [K12](../src/index.html#L602) | **Tegneserien som SVG** (linje 602) | `person()`, `patientBed()`, `prop()`, `panel()`, `wrap()` | Figurer tegnes direkte som SVG. Ingen billedfiler. Talebobler ombrydes til højst 3 linjer. |
+| [K13](../src/index.html#L652) | **Tegneserie og tidslinje** (linje 652) | `renderSide()`, `renderTimeline()` | Viser tegneserien for den aktuelle node og tegner tidslinjen ud fra `clockNow()`, `ANCHOR` og `S.path`. |
+| [K14](../src/index.html#L673) | **render() – tilstandsmaskinen** (linje 673) | `render()`, `goNode()` | Tegner skærmen ud fra `S.phase`: profile → start → info → stress → feedback/over → … → end. Profilen spørges igen, hvis før-spørgsmålene mangler. |
+| [K15](../src/index.html#L842) | **Nedtællingen** (linje 842) | `startTimer()`, `stopTimer()` | Tælleren viser hele sekunder (`Math.ceil`). Svartid måles i ms, og pulsen stiger. Tiden ude = `choose("timeout")` = game over. |
+| [K16](../src/index.html#L861) | **Et valg** (linje 861) | `row()`, `choose()` | Bygger én datarække. X1/X2/timeout = game over, A/B = feedback. |
+| [K17](../src/index.html#L884) | **Bedømmelse og næste node** (linje 884) | `rate()` | Tjekker at de fire spørgsmål er besvaret (pres, sikkerhed, følt ansvar, hvad styrede), gemmer og går videre til `R{runde+1}-{vej}` eller slutskærmen. |
+| [K18](../src/index.html#L899) | **Små hændelser og opstart** (linje 899) | `addEventListener`, `render()` | Mus over navn lyser stuen op, tasterne 1-4 vælger, klik på kaldenavn skifter profil. Til sidst første `render()`. |
 
 ## src/Code.gs – serveren
 
@@ -52,23 +52,23 @@ Klik på referencen for at hoppe direkte til linjen på GitHub, eller søg efter
 | [G4](../src/Code.gs#L54) | **Faneblade** (linje 54) | `sheet_()` | Finder eller opretter fanebladet og retter overskriftsrækken til `COLS`. |
 | [G5](../src/Code.gs#L69) | **Gem én række** (linje 69) | `logRow()` | Whitelist via `COLS`, tekst kortes til 300 tegn, `'` foran `= + - @` (formel-injektion), `LockService` mod samtidige skrivninger. |
 | [G6](../src/Code.gs#L92) | **Læs data** (linje 92) | `rows_()`, `getData(key)` | Laver rækker om til objekter. Kun med den rigtige nøgle. |
-| [G7](../src/Code.gs#L111) | **Top 5** (linje 111) | `getHighscore()` | Tæller korrekte valg, spil og hele vagter pr. spiller. Returnerer kun kaldenavn og tal. |
-| [G8](../src/Code.gs#L130) | **Opsæt ark** (linje 130) | `opsaetArk()` | Køres manuelt fra editoren. |
+| [G7](../src/Code.gs#L111) | **Opsæt ark** (linje 111) | `opsaetArk()` | Køres manuelt fra editoren. |
 
 ## src/Resultater.html – resultatsiden
 
 | Ref | Del | Navne i koden | Hvad sker der |
 |---|---|---|---|
-| [R1](../src/Resultater.html#L102) | **Konstanter og hjælpere** (linje 102) | `KEY`, `avg`, `f1`, `pct` | `%%KEY%%` og `%%GAME_URL%%` sættes ind af serveren [G2]. |
-| [R2](../src/Resultater.html#L116) | **Hent data** (linje 116) | `load()` | Kalder `getData()` [G6] hvert 15. sekund. |
-| [R3](../src/Resultater.html#L125) | **Saml pr. spiller** (linje 125) | `players()` | Kobler Spillere, Valg og Slutninger via spiller-ID og regner gennemsnit ud. |
-| [R4](../src/Resultater.html#L150) | **Tegn siden** (linje 150) | `render()` | Hver blok fylder én sektion. |
-| [R5](../src/Resultater.html#L160) | **System eller genvej pr. runde** (linje 160) |  | Andel A/B, svartid og stress pr. runde. |
-| [R6](../src/Resultater.html#L169) | **Efter baggrund** (linje 169) |  | Sammenligning af grupper. |
-| [R7](../src/Resultater.html#L176) | **Her døde flest + profiler** (linje 176) |  | Game over pr. node og fordeling af slutprofiler. |
-| [R8](../src/Resultater.html#L184) | **Beslutningsoplevelse** (linje 184) | `DR` | Stress, sikkerhed, "hurtig og usikker" (under 5 sek. og sikkerhed 1-2) og hvad der styrede valget. |
-| [R9](../src/Resultater.html#L198) | **Ansvar, job og refleksion** (linje 198) | `bars()` | Hvem fik skylden, job i plejen før/efter, sværeste dilemma, synsændring, fritekst. |
-| [R10](../src/Resultater.html#L226) | **Tabel pr. spiller** (linje 226) | `cols` | Sortérbar tabel. Klik på række viser alle valg. |
+| [R1](../src/Resultater.html#L114) | **Konstanter og hjælpere** (linje 114) | `KEY`, `avg`, `f1`, `pct` | `%%KEY%%` og `%%GAME_URL%%` sættes ind af serveren [G2]. |
+| [R2](../src/Resultater.html#L128) | **Hent data** (linje 128) | `load()` | Kalder `getData()` [G6] hvert 15. sekund. |
+| [R3](../src/Resultater.html#L137) | **Saml pr. spiller** (linje 137) | `players()` | Kobler Spillere, Valg og Slutninger via spiller-ID og regner gennemsnit ud. |
+| [R4](../src/Resultater.html#L162) | **Tegn siden** (linje 162) | `render()` | Hver blok fylder én sektion. |
+| [R5](../src/Resultater.html#L172) | **System eller genvej pr. runde** (linje 172) |  | Andel A/B, svartid og stress pr. runde. |
+| [R6](../src/Resultater.html#L181) | **Efter baggrund** (linje 181) |  | Sammenligning af grupper. |
+| [R7](../src/Resultater.html#L188) | **Her døde flest + profiler** (linje 188) |  | Game over pr. node og fordeling af slutprofiler. |
+| [R8](../src/Resultater.html#L196) | **Beslutningsoplevelse** (linje 196) | `DR` | Stress, sikkerhed, "hurtig og usikker" (under 5 sek. og sikkerhed 1-2) og hvad der styrede valget. |
+| [R9](../src/Resultater.html#L210) | **Ansvar, job og refleksion** (linje 210) | `bars()` | Hvem fik skylden, job i plejen før/efter, sværeste dilemma, synsændring, fritekst. |
+| [R10](../src/Resultater.html#L270) | **Tabel pr. spiller** (linje 270) | `cols` | Sortérbar tabel. Klik på række viser alle valg (inkl. følt ansvar). |
+| [R11](../src/Resultater.html#L238) | **Forskningsspørgsmålet** (linje 238) | `pairs`, `d()`, `sgn()` | Parrer før-svar (Spillere) med efter-svar (Slutninger) pr. spiller og viser ændringen i oplevet ansvar og sværhed, følt ansvar pr. runde, realisme og opdeling efter alder og erfaring. |
 
 ## Sådan hænger det sammen: ét valg fra klik til regneark
 
@@ -82,7 +82,7 @@ sequenceDiagram
     Spil->>Spil: choose("B") [K16] måler svartid
     Spil->>Spil: render() viser feedback [K14]
     Spiller->>Spil: svarer stress, sikkerhed, styret
-    Spil->>Spil: rate() [K17]
+    Spil->>Spil: rate() [K17] (4 spørgsmål)
     Spil->>Server: google.script.run.logRow("Valg", række) [K7]
     Server->>Server: whitelist + rens tekst + lås [G5]
     Server->>Ark: appendRow
@@ -100,6 +100,8 @@ sequenceDiagram
 | Hvordan er data beskyttet? | Whitelist, 300 tegn, formel-injektion, `LockService`, nøgle til resultater [G5] [G2] [G6] |
 | Hvorfor skal man ikke udrulle igen ved hver rettelse? | `readFile_()` læser HTML fra Drive ved hvert besøg [G2] [G3] |
 | Hvordan bliver svartid og "hurtig og usikker" målt? | `S.t0` og `ms` i `choose()`, beregning i [R8] [K15] [K16] |
-| Hvordan virker tickeren? | Indhold x2 + `translateX(-50%)` [S3] [K13] |
+| Hvordan måles, om spillet ændrer synet på ansvar? | Samme spørgsmål før og efter (`PREPOST`), parret pr. spiller [K5] [K14] [R11] |
+| Hvordan virker tidslinjen? | Minutter omregnes til procent af vagten, `pos()` i `renderTimeline()` [S3] [K13] |
+| Hvordan virker tælleren? | `Math.ceil(left*SECONDS)` hvert frame [S4] [K15] |
 | Hvordan er tegneserien lavet? | SVG genereret i JavaScript fra `COMICS` [K4] [K12] |
 | Hvordan hænger patientnavne og monitor sammen? | `hl()` og `mouseover` [K11] [K18] [K10] |
