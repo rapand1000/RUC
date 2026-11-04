@@ -61,6 +61,9 @@ RES = [
  ('R9','Ansvar, job og refleksion','`bars()`','Hvem fik skylden, job i plejen før/efter, sværeste dilemma, synsændring, fritekst.'),
  ('R10','Tabel pr. spiller','`cols`','Sortérbar tabel. Klik på række viser alle valg (inkl. følt ansvar).'),
  ('R11','Forskningsspørgsmålet','`pairs`, `d()`, `sgn()`','Parrer før-svar (Spillere) med efter-svar (Slutninger) pr. spiller og viser ændringen i oplevet ansvar og sværhed, følt ansvar pr. runde, realisme og opdeling efter alder og erfaring.'),
+ ('R12','Filtre','`filterData()`, `GROUP`, `YOUNG`, `VIEW`','Viser alle, kun unge (Under 18, 18-24, Under 25) eller 25+, og skjuler testspillere (kaldenavn med "test"). Alle tal på siden regnes ud fra `VIEW`.'),
+ ('R13','Dilemmaerne','`nodeOf()`, `NODE_TITLES`, `hardBy`','Én række pr. situation med valg, stress, sikkerhed, følt ansvar og hvor mange der valgte den som sværest. Node findes ud fra vej + runde.'),
+ ('R14','Opsummering','`line`, `topOf()`','Skriver svaret på forskningsspørgsmålet i almindelige sætninger ud fra de beregnede tal. Advarer, når under 10 har svaret før og efter.'),
 ]
 
 def lines(path, hdr):
@@ -128,6 +131,8 @@ sequenceDiagram
 | Hvordan er data beskyttet? | Whitelist, 300 tegn, formel-injektion, `LockService`, nøgle til resultater [G5] [G2] [G6] |
 | Hvorfor skal man ikke udrulle igen ved hver rettelse? | `readFile_()` læser HTML fra Drive ved hvert besøg [G2] [G3] |
 | Hvordan bliver svartid og "hurtig og usikker" målt? | `S.t0` og `ms` i `choose()`, beregning i [R8] [K15] [K16] |
+| Hvordan vises kun unge spillere? | `filterData()` laver `VIEW` ud fra aldersgruppen [R12] |
+| Hvordan ved resultatsiden, hvilket dilemma der var sværest? | Runden + spillerens vej giver node-ID'et, `nodeOf()` [R13] |
 | Hvordan måles, om spillet ændrer synet på ansvar? | Samme spørgsmål før og efter (`PREPOST`), parret pr. spiller [K5] [K14] [R11] |
 | Hvordan virker tidslinjen? | Minutter omregnes til procent af vagten, `pos()` i `renderTimeline()` [S3] [K13] |
 | Hvordan virker tælleren? | `Math.ceil(left*SECONDS)` hvert frame [S4] [K15] |

@@ -10,7 +10,7 @@ RUC · Kandidat i Digital Transformation · Designmetoder og Teknologi · Worksh
 |---|---|
 | **Spil det** | Scan QR-koden nedenfor, eller åbn [spillet](https://script.google.com/macros/s/AKfycbwyFGlXsJP9r9zBL3Sj3_O9xim90FAZLbTgMMdgeHsT-iR2FhZl88P5j0K8o-wyJUxY/exec) |
 | **Kildekode** | [src/index.html](src/index.html) (spillet) · [src/Code.gs](src/Code.gs) (serveren) · [src/Resultater.html](src/Resultater.html) (resultater) |
-| **Kodeguide** | [docs/kodeguide.md](docs/kodeguide.md): alle referencer [S1]-[R11] med linjenumre og typiske eksamensspørgsmål |
+| **Kodeguide** | [docs/kodeguide.md](docs/kodeguide.md): alle referencer [S1]-[R14] med linjenumre og typiske eksamensspørgsmål |
 | **Historierne** | [docs/historier.md](docs/historier.md): 31 situationer, 124 valg og 32 slutninger |
 | **Data** | [docs/data.md](docs/data.md): hvad gemmes, og hvilke forskningsspørgsmål det besvarer |
 
@@ -40,7 +40,7 @@ Spillet er designeksperimentet (Research through Design). Vi måler oplevelsen p
 2. **Under vagten**: efter hvert valg: pres, sikkerhed, *hvor meget føltes beslutningen som dit ansvar?* og hvad styrede valget. Svartiden måles automatisk. Ved game over: hvem havde ansvaret?
 3. **Efter vagten**: hvor virkelig føltes vagten, sværeste dilemma, syn på plejepersonalets ansvar og lyst til et job i plejen.
 
-Resultatsiden samler det i sektionen *Forskningsspørgsmålet* ([R11]). Se alle kolonner i [docs/data.md](docs/data.md).
+Resultatsiden er bygget op om forskningsspørgsmålet: først et skrevet svar ud fra tallene ([R14]), derefter tre afsnit, *Oplevelsen af ansvar*, *Oplevelsen af beslutningstagning* og *Simulationens rolle*, og en tabel over alle dilemmaer ([R13]). Man kan vise kun unge og skjule testspillere ([R12]). Se alle kolonner i [docs/data.md](docs/data.md).
 
 ### Designkoncept
 
@@ -85,13 +85,13 @@ Layoutet følger gruppens skitse: én kolonne, der læses oppefra og ned, på b�
 | ![Stress](docs/billeder/04-stress.png) | **4. Stress-kort.** Fire valg i tilfældig rækkefølge. Tælleren tæller ned fra 15 og bliver rød de sidste 5 sekunder. Pulsen stiger, mens tiden løber. |
 | ![Feedback](docs/billeder/05-feedback.png) | **5. Feedback.** Hvad betyder valget? Derefter: Hvor presset? Hvor sikker? Hvor meget var det dit ansvar? Hvad styrede valget? |
 | ![Game over](docs/billeder/06-game-over.png) | **6. Game over.** Et skørt valg eller for langsom. Spilleren svarer på, hvem der havde ansvaret: mig, kollegaen, systemet eller ledelsen. |
-| ![Slut](docs/billeder/07-slut.png) | **7. Slutning.** Én af 32 slutninger, en profil, de to efter-spørgsmål, realisme og refleksion. |
+| ![Slut](docs/billeder/07-slut.png) | **7. Slutning.** Én af 32 slutninger, en profil, de to efter-spørgsmål, realisme og refleksion. Ved "sværeste dilemma" ser spilleren titlen på sine egne fem situationer og hvad hun valgte, så hun ikke skal huske det. |
 | ![Mobil](docs/billeder/08-mobil.png) | **8. Mobil.** Samme rækkefølge. Tælleren klæber øverst, så den altid kan ses. Langt de fleste spiller på telefonen. |
 
 ### Resultatsiden
 
 ![Resultatsiden med demodata](docs/billeder/09-resultater.png)
-*Resultatsiden (her med fiktive demodata). Opdateres hvert 15. sekund. Linket kræver en hemmelig nøgle og deles kun i gruppen.*
+*Resultatsiden (her med fiktive demodata), bygget op om forskningsspørgsmålet. Opdateres hvert 15. sekund. Linket kræver en hemmelig nøgle og deles kun i gruppen.*
 
 ### Proces og iterationer
 
@@ -192,7 +192,7 @@ Så er 31 situationer (1 + 2 + 4 + 8 + 16) nok til 32 slutninger, og hele indhol
 ### Mappestruktur
 
 ```
-src/        kildekoden med forklarende kommentarer ([S1]-[R11])
+src/        kildekoden med forklarende kommentarer ([S1]-[R14])
 docs/       kodeguide, historier, data og billeder
 tools/      små scripts, der genererer kodeguide.md og historier.md ud fra koden
 ```

@@ -92,7 +92,7 @@ erDiagram
 | ts, player, nick, game, attempt | | Som ovenfor |
 | path | AABBA | Hele vejen gennem de 5 runder |
 | profile | Balancegangeren | Slutprofil efter antal A-valg |
-| svaerest | 3 | "Hvilket dilemma var sværest?" Runde 1-5 |
+| svaerest | 3 | "Hvilket dilemma var sværest?" Runde 1-5. Spilleren ser titlerne på sine egne situationer. Resultatsiden finder situationen med `path` + runde ([R13]) |
 | synsaendring | 4 | "Har spillet ændret dit syn på plejepersonalets ansvar?" 1-5 |
 | interesse_efter | Ja | "Overvejer du nu et job i plejen?" |
 | overrasket | | "Hvad overraskede dig mest?" Fritekst, frivillig |
@@ -110,7 +110,8 @@ erDiagram
 | Ændrer spillet, hvor svært det opleves at beslutte? | `svaert_efter` − `svaert_foer` pr. spiller | [R11] |
 | Hvor meget føles beslutningerne som spillerens eget ansvar? | `ansvar_foelt` pr. runde | [R11] |
 | Føltes simulationen troværdig? | `realisme` | [R11] |
-| Er der forskel på alder og erfaring? | `age`, `erfaring` | [R11] |
+| Er der forskel på alder og erfaring? | `age`, `erfaring` | [R11] [R12] |
+| Hvilke dilemmaer er sværest, og hvordan føles de? | `svaerest` + `path`, `stress`, `sikkerhed`, `ansvar_foelt` pr. `node` | [R13] |
 | Vælger unge systemets vej (A) eller genvejen (B)? | `choice` pr. `round` | [R5] |
 | Hvor presset føles beslutningen, og hvor sikker er man? | `stress`, `sikkerhed`, `ms` | [R8] |
 | Hvor mange træffer hurtige og usikre valg? | `ms` < 5000 og `sikkerhed` ≤ 2 | [R8] |
