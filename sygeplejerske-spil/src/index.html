@@ -175,6 +175,11 @@ canvas{width:100%;height:96px;display:block}
 .opt{border:1.5px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 12px;min-width:44px;font-size:15px}
 .opt:hover{border-color:var(--accent)}
 .opt.sel{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.opts.dl{display:grid;gap:6px}
+.opts.dl .opt{text-align:left;display:grid;gap:2px;padding:10px 12px}
+.opts.dl .opt b{font-family:var(--display);font-size:17px;letter-spacing:.02em}
+.opts.dl .opt small{font-size:13px;color:var(--muted);line-height:1.35}
+.opts.dl .opt.sel small{color:var(--accent-ink);opacity:.85}
 .thanks{color:var(--accent);font-weight:700}
 .actions.two{grid-template-columns:2fr 1fr}
 @media (max-width:760px){.actions.two{grid-template-columns:1fr}}
@@ -585,6 +590,13 @@ function chips(){
 }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
 function stopTimer(){ cancelAnimationFrame(S.raf); $("count").classList.remove("on","low"); }
+/* dilemmaOpts() viser spillerens egne fem situationer som valgmuligheder: runde, klokkeslæt,
+   titel og det valg, spilleren tog. Node-ID'et findes ud fra vejen (S.path), fx R3-AB. */
+const nodeOf = r => r===1 ? "R1" : `R${r}-${S.path.slice(0,r-1)}`;
+function dilemmaOpts(sel){
+  return `<div class="opts dl" data-q="svaerest">${[1,2,3,4,5].map(r=>{ const n = N[nodeOf(r)], k = S.path[r-1];
+    return `<button type="button" class="opt ${sel==r?"sel":""}" data-v="${r}"><b>Runde ${r} · kl. ${fmt(ANCHOR[r])} · ${esc(n.title)}</b><small>Du valgte ${k}: ${esc(n.c[k][0])}</small></button>`; }).join("")}</div>`;
+}
 function opts(name, list, sel, labels){
   return `<div class="opts" data-q="${name}">${list.map((v,i)=>`<button type="button" class="opt ${sel==v?"sel":""}" data-v="${esc(v)}">${esc(labels?labels[i]:v)}</button>`).join("")}</div>`;
 }
@@ -814,7 +826,7 @@ function render(){
         <div class="q"><b>Nu hvor du har prøvet det: ${PREPOST.ansvar.q.charAt(0).toLowerCase()+PREPOST.ansvar.q.slice(1)}</b><span class="sc">${PREPOST.ansvar.sc}</span>${opts("ansvar_efter",[1,2,3,4,5],e.ansvar_efter)}</div>
         <div class="q"><b>Og: ${PREPOST.svaert.q.charAt(0).toLowerCase()+PREPOST.svaert.q.slice(1)}</b><span class="sc">${PREPOST.svaert.sc}</span>${opts("svaert_efter",[1,2,3,4,5],e.svaert_efter)}</div>
         <div class="q"><b>Hvor virkelig føltes vagten?</b><span class="sc">1 = slet ikke · 5 = som en rigtig vagt</span>${opts("realisme",[1,2,3,4,5],e.realisme)}</div>
-        <div class="q"><b>Hvilket dilemma var sværest?</b>${opts("svaerest",[1,2,3,4,5],e.svaerest,["Runde 1","Runde 2","Runde 3","Runde 4","Runde 5"])}</div>
+        <div class="q"><b>Hvilket dilemma var sværest?</b><span class="sc">Her er de fem situationer, du selv var igennem, og hvad du valgte.</span>${dilemmaOpts(e.svaerest)}</div>
         <div class="q"><b>Har spillet ændret dit syn på plejepersonalets ansvar?</b><span class="sc">1 = slet ikke · 5 = meget</span>${opts("synsaendring",[1,2,3,4,5],e.synsaendring)}</div>
         <div class="q"><b>Overvejer du nu et job i plejen?</b>${opts("interesse_efter",["Ja","Måske","Nej"],e.interesse_efter)}</div>
         <div class="field"><label for="surp">Hvad overraskede dig mest? <small>(frivilligt)</small></label><textarea id="surp" maxlength="300">${esc(e.overrasket||"")}</textarea></div>
