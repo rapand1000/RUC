@@ -5,7 +5,7 @@
   Apps Script er JavaScript, der kører hos Google. Denne fil gør tre ting:
     1. Viser spillet og resultatsiden som en web-app (doGet)        [G2]
     2. Gemmer hvert svar som en række i et Google Sheet (logRow)    [G5]
-    3. Leverer data til resultatsiden og top 5 (getData, getHighscore) [G6][G7]
+    3. Leverer data til resultatsiden (getData)                     [G6]
   Web-appen kører som ejeren (Ralf), så spillerne ikke skal logge ind og ikke får
   adgang til Sheetet. De kan kun kalde funktionerne nedenfor.
 ================================================================================
@@ -18,9 +18,9 @@ var FOLDER_ID = 'DIN_DRIVE_MAPPE_ID';   // id på Drive-mappen med index.html og
 var SHEET_ID  = 'DIT_SHEET_ID';         // id på Google Sheetet, der samler data
 var KEY       = 'SKIFT_MIG';            // hemmelig nøgle til resultatsiden. Aldrig i et offentligt repo!
 var COLS = {
-  Spillere: ['ts', 'player', 'nick', 'age', 'bg', 'desc', 'erfaring', 'interesse_foer', 'kendskab'],
-  Valg: ['ts', 'player', 'nick', 'attempt', 'node', 'round', 'choice', 'outcome', 'ms', 'stress', 'game', 'sikkerhed', 'styret', 'ansvar'],
-  Slutninger: ['ts', 'player', 'nick', 'attempt', 'path', 'profile', 'game', 'svaerest', 'synsaendring', 'interesse_efter', 'overrasket']
+  Spillere: ['ts', 'player', 'nick', 'age', 'bg', 'desc', 'erfaring', 'interesse_foer', 'kendskab', 'ansvar_foer', 'svaert_foer'],
+  Valg: ['ts', 'player', 'nick', 'attempt', 'node', 'round', 'choice', 'outcome', 'ms', 'stress', 'game', 'sikkerhed', 'styret', 'ansvar', 'ansvar_foelt'],
+  Slutninger: ['ts', 'player', 'nick', 'attempt', 'path', 'profile', 'game', 'svaerest', 'synsaendring', 'interesse_efter', 'overrasket', 'ansvar_efter', 'svaert_efter', 'realisme']
 };
 
 /* [G2] doGet kører, når nogen åbner linket. ?side=resultater&noegle=... giver
@@ -108,26 +108,7 @@ function getData(key) {
   return res;
 }
 
-/* [G7] TOP 5. Grupperer alle valg pr. spiller og tæller:
-   korrekte = valg der førte videre, spil = antal forskellige vagter,
-   gennemfoert = antal hele vagter. Sorteres efter korrekte svar.
-   Returnerer kun kaldenavn og tal, ingen profiloplysninger. */
-function getHighscore() {
-  var by = {};
-  rows_('Valg').forEach(function (r) {
-    if (!r.player) return;
-    var p = by[r.player] || (by[r.player] = { nick: r.nick || '?', games: {}, korrekte: 0, gennemfoert: 0 });
-    p.games[r.game || ('a' + r.attempt)] = 1;
-    if (r.outcome === 'videre') p.korrekte++;
-  });
-  rows_('Slutninger').forEach(function (r) { if (by[r.player]) by[r.player].gennemfoert++; });
-  return Object.keys(by).map(function (k) {
-    var p = by[k];
-    return { nick: String(p.nick).slice(0, 24), spil: Object.keys(p.games).length, korrekte: p.korrekte, gennemfoert: p.gennemfoert };
-  }).sort(function (a, b) { return b.korrekte - a.korrekte || b.gennemfoert - a.gennemfoert || a.spil - b.spil; }).slice(0, 5);
-}
-
-/* [G8] Hjælpefunktion, der køres manuelt fra editoren for at oprette/opdatere fanebladene. */
+/* [G7] Hjælpefunktion, der køres manuelt fra editoren for at oprette/opdatere fanebladene. */
 function opsaetArk() {
   Object.keys(COLS).forEach(function (n) { sheet_(n); });
 }

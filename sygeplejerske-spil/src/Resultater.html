@@ -6,7 +6,7 @@
   hemmelige nøgle i linket (tjekkes både i doGet og getData i Code.gs).
   Data hentes fra Sheetet hvert 15. sekund, og alle beregninger (gennemsnit,
   fordelinger, grupperinger) laves her i browseren.
-     [R1]-[R10] henviser til docs/kodeguide.md.
+     [R1]-[R11] henviser til docs/kodeguide.md.
 ================================================================================
 -->
 <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
@@ -27,6 +27,8 @@ body{font-family:var(--body);font-size:15px;line-height:1.5;padding:16px max(16p
 .wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 h1,h2{font-family:var(--display);font-weight:700;margin:0;line-height:1.05}
 h1{font-size:clamp(26px,4vw,36px)} h2{font-size:22px}
+h3{font-family:var(--display);font-weight:700;font-size:18px;margin:6px 0 4px}
+.panel.rq{border:2px solid var(--accent)}
 .top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
 .muted{color:var(--muted);font-size:13px}
 .panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
@@ -71,6 +73,16 @@ button{font:inherit;color:inherit;background:var(--surface);border:1px solid var
   <div class="panel">
     <div class="kpis" id="kpis"></div>
     <div class="qr"><div id="qrbox"></div><div><b>Scan for at spille</b><div class="url">%%GAME_URL%%</div></div></div>
+  </div>
+  <div class="panel rq"><h2>Forskningsspørgsmålet</h2>
+    <p class="muted"><b>Hvordan kan interaktive simulationer påvirke unges oplevelse af ansvar og beslutningstagning i sygeplejefaget?</b><br>
+    Samme spørgsmål stilles før og efter vagten. Kun spillere, der har svaret begge gange, tæller med i før/efter.</p>
+    <div class="kpis" id="rqk"></div>
+    <div class="grid">
+      <div><h3>Før og efter</h3><div id="rqpp"></div></div>
+      <div><h3>Følt ansvar pr. runde</h3><p class="muted">"Hvor meget føltes beslutningen som dit ansvar?" (1-5)</p><div id="rqfelt"></div></div>
+    </div>
+    <h3>Efter alder og erfaring</h3><div id="rqgrp"></div>
   </div>
   <div class="grid">
     <div class="panel"><h2>System eller genvej pr. runde</h2>
@@ -223,6 +235,38 @@ function render(){
   const su = E.filter(e=>e.overrasket);
   $("surp").innerHTML = su.length ? su.slice(-30).reverse().map(e=>`<li>${esc(e.overrasket)} <span>– ${esc(e.nick)}</span></li>`).join("") : `<li class="empty" style="list-style:none">Ingen svar endnu.</li>`;
 
+  /* [R11] FORSKNINGSSPØRGSMÅLET. Parrer hver spillers før-svar (fanen Spillere) med
+     efter-svar (seneste række i Slutninger) og regner ændringen ud. Positiv ændring i
+     "ansvar" = spillet fik dem til at se ansvaret som større. Følt ansvar pr. runde
+     kommer fra fanen Valg. Realisme viser, om simulationen føltes troværdig. */
+  const last = {}; E.forEach(e=> last[e.player] = e);
+  const pairs = Object.values(last).map(e=>{ const p = prof[e.player]||{};
+    return {age:p.age||"Ikke angivet", erf:p.erfaring||"Ikke angivet", af:+p.ansvar_foer||0, ae:+e.ansvar_efter||0, sf:+p.svaert_foer||0, se:+e.svaert_efter||0, re:+e.realisme||0}; });
+  const pA = pairs.filter(x=>x.af&&x.ae), pS = pairs.filter(x=>x.sf&&x.se), re = pairs.map(x=>x.re).filter(x=>x>0);
+  const d = (arr,f,e) => avg(arr.map(x=>x[e]-x[f]));
+  const sgn = x => x==null ? "–" : (x>0?"+":"") + f1(x);
+  const fv = V.map(v=>+v.ansvar_foelt).filter(x=>x>0);
+  $("rqk").innerHTML = [
+    [pA.length,"har svaret før og efter"],
+    [sgn(d(pA,"af","ae")),"ændring i oplevet ansvar"],
+    [pA.length?pct(pA.filter(x=>x.ae>x.af).length,pA.length)+" %":"–","ser ansvaret som større efter"],
+    [sgn(d(pS,"sf","se")),"ændring i hvor svært det er"],
+    [f1(avg(fv)),"gns. følt ansvar pr. valg"],
+    [f1(avg(re)),"hvor virkelig (1-5)"]
+  ].map(([b,t])=>`<div class="kpi"><b>${b}</b><span>${t}</span></div>`).join("");
+  const ppRow = (lbl,arr,f,e) => `<tr><td>${lbl}</td><td class="n">${f1(avg(arr.map(x=>x[f])))}</td><td class="n">${f1(avg(arr.map(x=>x[e])))}</td><td class="n"><b>${sgn(d(arr,f,e))}</b></td><td class="n">${arr.length}</td></tr>`;
+  $("rqpp").innerHTML = pA.length||pS.length ? `<div class="tbl"><table><thead><tr><th></th><th>Før</th><th>Efter</th><th>Ændring</th><th>Svar</th></tr></thead><tbody>${ppRow("Ansvar",pA,"af","ae")}${ppRow("Svært at beslutte",pS,"sf","se")}</tbody></table></div>`
+    : `<p class="empty">Ingen har svaret før og efter endnu.</p>`;
+  let fh = "";
+  for(let r=1;r<=5;r++){ const x = V.filter(v=>+v.round===r).map(v=>+v.ansvar_foelt).filter(y=>y>0), a = avg(x);
+    fh += `<div class="bar-row"><span class="lbl">Runde ${r}</span><div class="bar"><i class="a" style="width:${a?a/5*100:0}%"></i></div><span class="val">${f1(a)}</span></div>`; }
+  $("rqfelt").innerHTML = fv.length ? fh : `<p class="empty">Ingen svar endnu.</p>`;
+  const grp = key => { const g = {}; pairs.forEach(x=>{ (g[x[key]]=g[x[key]]||[]).push(x); }); return g; };
+  const grpRows = (title,key) => Object.entries(grp(key)).map(([k,arr])=>{ const a = arr.filter(x=>x.af&&x.ae), sv = arr.filter(x=>x.sf&&x.se);
+    return `<tr><td>${title}: ${esc(k)}</td><td class="n">${arr.length}</td><td class="n">${sgn(d(a,"af","ae"))}</td><td class="n">${sgn(d(sv,"sf","se"))}</td><td class="n">${f1(avg(arr.map(x=>x.re).filter(y=>y>0)))}</td></tr>`; }).join("");
+  $("rqgrp").innerHTML = pairs.length ? `<div class="tbl"><table><thead><tr><th>Gruppe</th><th>Gennemført</th><th>Ændring ansvar</th><th>Ændring svært</th><th>Hvor virkelig</th></tr></thead><tbody>${grpRows("Alder","age")}${grpRows("Erfaring","erf")}</tbody></table></div>`
+    : `<p class="empty">Ingen har gennemført vagten endnu.</p>`;
+
   /* [R10] TABEL PR. SPILLER. Klik på kolonne = sortér, klik på række = vis alle valg. */
   const cols = [["nick","Kaldenavn"],["age","Alder"],["bg","Baggrund"],["forsoeg","Forsøg"],["valg","Valg"],["svartid","Gns. svartid"],["stress","Gns. stress"],["over","Game over"],["timeout","Tid løbet ud"],["andelA","Andel A"],["sikkerhed","Gns. sikkerhed"],["styret","Styret mest af"],["erf","Erfaring"],["intf","Job i plejen før → efter"],["runde","Nået"]];
   $("thead").innerHTML = cols.map(([k,l])=>`<th data-k="${k}">${l}${sortKey===k?(sortDir<0?" ↓":" ↑"):""}</th>`).join("");
@@ -232,7 +276,7 @@ function render(){
     const main = `<tr class="p" data-id="${esc(p.id)}"><td><b>${esc(p.nick)}</b>${p.desc?`<div class="muted">${esc(p.desc)}</div>`:""}</td><td>${esc(p.age)}</td><td>${esc(p.bg)}</td>
       <td class="n">${p.forsoeg}</td><td class="n">${p.valg}</td><td class="n">${f1(p.svartid)} s</td><td class="n">${f1(p.stress)}</td><td class="n">${p.over}</td><td class="n">${p.timeout}</td>
       <td class="n">${p.andelA==null?"–":Math.round(p.andelA*100)+" %"}</td><td class="n">${f1(p.sikkerhed)}</td><td>${esc(p.styret)||"–"}</td><td>${esc(p.erf)||"–"}</td><td>${p.intf||p.inte?esc(p.intf||"?")+" → "+esc(p.inte||"?"):"–"}</td><td>${p.slut?`<span class="pill ok">${esc(p.slut.profile)}</span>`:p.runde?`Runde ${p.runde}`:"–"}</td></tr>`;
-    const det = open.has(p.id) ? `<tr class="d"><td colspan="15"><div class="steps">${p.rows.map(v=>`<span class="pill ${v.outcome!=="videre"?"x":v.choice==="B"?"b":"ok"}">F${v.attempt} · ${esc(v.node)} · ${esc(v.choice)} · ${f1(+v.ms/1000)} s${v.stress?` · stress ${v.stress}`:""}${v.sikkerhed?` · sikker ${v.sikkerhed}`:""}${v.styret?` · ${esc(v.styret)}`:""}${v.ansvar?` · skyld: ${esc(v.ansvar)}`:""}</span>`).join("")}</div></td></tr>` : "";
+    const det = open.has(p.id) ? `<tr class="d"><td colspan="15"><div class="steps">${p.rows.map(v=>`<span class="pill ${v.outcome!=="videre"?"x":v.choice==="B"?"b":"ok"}">F${v.attempt} · ${esc(v.node)} · ${esc(v.choice)} · ${f1(+v.ms/1000)} s${v.stress?` · stress ${v.stress}`:""}${v.sikkerhed?` · sikker ${v.sikkerhed}`:""}${v.ansvar_foelt?` · ansvar ${v.ansvar_foelt}`:""}${v.styret?` · ${esc(v.styret)}`:""}${v.ansvar?` · skyld: ${esc(v.ansvar)}`:""}</span>`).join("")}</div></td></tr>` : "";
     return main + det;
   }).join("") : `<tr><td colspan="15" class="empty">Ingen spillere endnu.</td></tr>`;
   $("players").querySelectorAll("tr.p").forEach(tr=> tr.onclick = ()=>{ const id = tr.dataset.id; open.has(id)?open.delete(id):open.add(id); render(); });

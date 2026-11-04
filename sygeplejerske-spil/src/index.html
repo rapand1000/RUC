@@ -11,6 +11,8 @@
   Hvordan?       Én HTML-fil med CSS og JavaScript. Ingen frameworks.
                  Filen serveres af Google Apps Script (se Code.gs) og sender
                  hvert valg til et Google Sheet via google.script.run.
+  Layout (én kolonne, oppefra og ned, som i gruppens skitse):
+     tegneserie → situation + nedtælling → 4 svar → tidslinje → patientovervågning
 
   Læsevejledning: Koden er delt i nummererede afsnit. Numrene bruges også i
   docs/kodeguide.md, så man kan slå op fra dokumentationen til koden.
@@ -27,7 +29,6 @@
    Alle farver er defineret som CSS-variabler (--navn) ét sted. Resten af koden
    bruger kun variablerne, så lys/mørk tilstand og farveskift kan styres her.
    --mon-*  = patientmonitorens farver (altid mørk, som en rigtig skærm).       */
-/* Layout: a ward workstation. Patient monitor left, the card's text right, four action keys along the bottom. Stacks on phones. */
 :root{
   --bg:#E9EFF0; --surface:#FFFFFF; --ink:#14232A; --muted:#55686F; --line:#CCD8DB;
   --accent:#0D6B68; --accent-ink:#FFFFFF; --accent-soft:#D6EBE9;
@@ -48,7 +49,7 @@
   --alarm:#FF6B60; --alarm-soft:#3A1A19; --warn:#E3A93A; --warn-soft:#3A2C12; color-scheme:dark}
 html,body{background:var(--bg);color:var(--ink)}
 body{font-family:var(--body);font-size:16px;line-height:1.55;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 28px}
-.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+.wrap{max-width:1040px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
 button{font:inherit;color:inherit;cursor:pointer}
 button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
 h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:.01em;text-wrap:balance;margin:0;line-height:1.05}
@@ -63,51 +64,52 @@ h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:.01em;text-wr
 .chip{font-family:var(--mono);font-size:13px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-variant-numeric:tabular-nums;white-space:nowrap}
 .chip.btn{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.04em}
 
-/* [S3] TOP 5-TICKER: 30 px bjælke der ruller fra højre mod venstre.
-   Indholdet ligger to gange efter hinanden, og animationen flytter det -50 %,
-   så rulningen ser uendelig ud. Stopper ved mus-over og ved 'reduceret bevægelse'. */
-/* top 5-ticker */
-.ticker{height:30px;display:flex;align-items:center;background:var(--mon-bg);color:var(--mon-text);border:1px solid var(--mon-line);border-radius:6px;overflow:hidden;font-family:var(--mono);font-size:13px}
-.tk-label{flex:none;height:100%;display:flex;align-items:center;padding:0 12px;background:var(--accent);color:var(--accent-ink);font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.08em;text-transform:uppercase}
-.tk-view{flex:1;min-width:0;overflow:hidden;height:100%;display:flex;align-items:center}
-.tk-track{display:flex;width:max-content;white-space:nowrap;animation:tk var(--tk-dur,40s) linear infinite}
-.tk-view:hover .tk-track{animation-play-state:paused}
-.tk-item{padding:0 22px;display:inline-flex;gap:8px;align-items:baseline}
-.tk-item b{color:#fff}
-.tk-item .rk{color:var(--mon-ecg);font-weight:700}
-.tk-item.me b{color:var(--mon-spo2)}
-.tk-item .sep{color:var(--mon-line)}
-@keyframes tk{from{transform:translateX(0)}to{transform:translateX(-50%)}}
-@media (prefers-reduced-motion:reduce){.tk-view{overflow-x:auto}.tk-track{animation:none}}
+/* [S3] TIDSLINJE: vagten fra 06.50 til 15.00 som en vandret linje. Fyldet viser, hvor
+   langt dagen er nået, og de fem prikker er runderne (grøn = A, gul = B). */
+.timeline{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:12px 18px 10px}
+.tl-head{display:flex;justify-content:space-between;gap:8px;white-space:nowrap;font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.06em;text-transform:uppercase}
+.tl-track{position:relative;height:6px;border-radius:3px;background:var(--line);margin:18px 6px 30px}
+.tl-fill{position:absolute;left:0;top:0;bottom:0;border-radius:3px;background:var(--accent);transition:width .6s}
+.tl-stop{position:absolute;top:50%;transform:translate(-50%,-50%);width:22px;height:22px;border-radius:50%;background:var(--surface);border:2px solid var(--line);display:grid;place-items:center;font-family:var(--mono);font-size:11px;font-weight:700;color:var(--muted)}
+.tl-stop.A{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.tl-stop.B{background:var(--warn);border-color:var(--warn);color:#fff}
+.tl-stop.cur{border-color:var(--alarm);color:var(--alarm);box-shadow:0 0 0 4px var(--alarm-soft)}
+.tl-stop span{position:absolute;top:26px;left:50%;transform:translateX(-50%);white-space:nowrap;font-family:var(--body);font-weight:400;font-size:11px;color:var(--muted)}
+@media (max-width:600px){.tl-stop span{display:none}.tl-track{margin-bottom:12px}.tl-head .mid{display:none}}
 
-/* [S4] NEDTÆLLING: vandret bjælke der skrumper på 15 sek. og bliver rød til sidst. */
-/* timer */
-.timer{height:8px;border-radius:4px;background:var(--line);overflow:hidden;visibility:hidden}
-.timer.on{visibility:visible}
-.timer i{display:block;height:100%;width:100%;background:var(--accent);transform-origin:left;transition:background .3s}
-.timer.low i{background:var(--alarm)}
+/* [S4] NEDTÆLLING: en stor tæller ved siden af situationen (i stedet for en bjælke).
+   Tælleren vises kun på stress-kortet og bliver rød de sidste 5 sekunder. */
+.situ{display:flex;gap:14px;align-items:stretch}
+.situ .card{flex:1}
+.count{display:none;min-width:112px;border-radius:var(--r);background:var(--surface);border:2px solid var(--accent);flex-direction:column;align-items:center;justify-content:center;padding:10px;font-family:var(--mono)}
+.count.on{display:flex}
+.count b{font-family:var(--display);font-size:64px;line-height:1;font-variant-numeric:tabular-nums;color:var(--accent)}
+.count small{font-size:12px;letter-spacing:.08em;color:var(--muted);text-transform:uppercase}
+.count.low{border-color:var(--alarm);background:var(--alarm-soft)}
+.count.low b{color:var(--alarm);animation:blink .5s steps(2) infinite}
+@media (max-width:560px){.situ{flex-direction:column}.count{flex-direction:row;gap:10px;min-width:0;padding:6px 12px;position:sticky;top:6px;z-index:2}.count b{font-size:40px}}
 
-/* [S5] SPILLETS TRE RAMMER: monitor (venstre) · kort (midt) · tegneserie (højre).
-   Responsivt: under 1100 px flyttes tegneserien ned, under 760 px stables alt. */
-/* stage */
-.stage{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr) minmax(220px,280px);gap:14px;align-items:start}
-@media (max-width:1100px){.stage{grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr)}.side{grid-column:1/-1}.side .strip{flex-direction:row}.side .strip svg{min-width:0}}
-@media (max-width:760px){.stage{grid-template-columns:1fr}.side .strip{overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px}.side .strip svg{min-width:230px;scroll-snap-align:start}.brand span{display:none}}
+/* [S5] SPILLETS RAMMER I ÉN KOLONNE: tegneserie · situation · svar · tidslinje · monitor.
+   Samme rækkefølge på pc og mobil, så skærmen læses oppefra og ned. */
+.stage{display:flex;flex-direction:column;gap:14px}
+@media (max-width:760px){.brand span{display:none}}
 
-.monitor{background:var(--mon-bg);color:var(--mon-text);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0;border:1px solid var(--mon-line)}
+.monitor{background:var(--mon-bg);color:var(--mon-text);border-radius:var(--r);padding:14px 16px;display:flex;flex-direction:column;gap:12px;min-width:0;border:1px solid var(--mon-line)}
 .mon-head{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
 .mon-head b{color:#fff;font-weight:700}
 .mon-alarm{color:var(--mon-alarm);visibility:hidden}
 .monitor.alarm .mon-alarm{visibility:visible;animation:blink .8s steps(2) infinite}
 @keyframes blink{50%{opacity:0}}
-.ecg-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+.ecg-row{display:grid;grid-template-columns:minmax(0,1fr) auto auto;gap:18px;align-items:center}
+@media (max-width:560px){.ecg-row{gap:10px}.vital strong{font-size:32px}.vital.spo2 strong{font-size:24px}}
 canvas{width:100%;height:96px;display:block}
 .vital{font-family:var(--mono);text-align:right;line-height:1}
 .vital small{display:block;font-size:11px;letter-spacing:.1em;color:var(--mon-text)}
 .vital strong{font-size:44px;font-weight:700;color:var(--mon-ecg);font-variant-numeric:tabular-nums}
 .vital.spo2 strong{color:var(--mon-spo2);font-size:28px}
 .monitor.alarm .vital strong{color:var(--mon-alarm)}
-.ward{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.ward{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px}
+@media (max-width:760px){.ward{grid-template-columns:repeat(2,minmax(0,1fr))}}
 .bed{border:1px solid var(--mon-line);border-left:5px solid var(--pc);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.3;transition:border-color .3s,background .3s}
 .bed .no{font-family:var(--mono);font-size:11px;letter-spacing:.08em;opacity:.75}
 .bed .nm{color:#fff;font-weight:700;display:flex;align-items:center;gap:6px}
@@ -117,7 +119,7 @@ canvas{width:100%;height:96px;display:block}
 .monitor.alarm .bed.focus{border-color:var(--mon-alarm);background:rgba(255,90,78,.1)}
 .monitor.alarm .bed.focus .dot{background:var(--mon-alarm);animation:blink .6s steps(2) infinite}
 
-/* [S6] KORTET i midten: info-, stress-, feedback-, game over- og slutkort. */
+/* [S6] KORTET med situationen: info-, stress-, feedback-, game over- og slutkort. */
 .card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:clamp(16px,3vw,26px);display:flex;flex-direction:column;gap:12px;min-width:0}
 .tag{align-self:flex-start;font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.12em;text-transform:uppercase;padding:3px 10px;border-radius:4px}
 .tag.info{background:var(--accent-soft);color:var(--accent)}
@@ -162,7 +164,7 @@ canvas{width:100%;height:96px;display:block}
 .note{font-size:13px;color:var(--muted)}
 
 /* [S8] PATIENTNAVNE i teksten (farvet 'pille' med stuenummer), forskningsspørgsmål
-   (knaprækker .opts) og tegneserie-kolonnen. */
+   (knaprækker .opts) og tegneserien øverst. */
 /* patient-navne, spørgsmål, side */
 .pt{display:inline-flex;align-items:baseline;gap:4px;background:color-mix(in srgb,var(--pc) 28%,transparent);border-bottom:2px solid var(--pc);border-radius:4px;padding:0 4px;font-weight:700;white-space:nowrap}
 .pt i{font-style:normal;font-family:var(--mono);font-size:.7em;font-weight:500;opacity:.8}
@@ -177,18 +179,10 @@ canvas{width:100%;height:96px;display:block}
 .actions.two{grid-template-columns:2fr 1fr}
 @media (max-width:760px){.actions.two{grid-template-columns:1fr}}
 .key.ghost{min-height:60px;align-items:center;justify-content:center;font-family:var(--display);font-weight:600;font-size:18px}
-.side{display:flex;flex-direction:column;gap:12px;min-width:0}
-.strip{display:flex;flex-direction:column;gap:8px}
+.side{min-width:0}
+.strip{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px}
 .strip svg{width:100%;height:auto;display:block}
-.hs{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:grid;gap:8px}
-.hs-h{font-family:var(--display);font-weight:700;font-size:22px}
-.hs ol{list-style:none;margin:0;padding:0;display:grid;gap:6px}
-.hs li{display:grid;grid-template-columns:24px 1fr;gap:2px 8px;align-items:baseline;padding:6px 8px;border-radius:8px;background:var(--bg)}
-.hs li.me{outline:2px solid var(--accent)}
-.hs .rk{font-family:var(--mono);font-weight:700;color:var(--accent);grid-row:span 2}
-.hs .nk{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hs .st{font-size:12px;color:var(--muted)}
-.hs .st b{color:var(--ink)}
+@media (max-width:640px){.strip{display:flex;overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px}.strip svg{min-width:78%;scroll-snap-align:start}}
 /* [S9] PROFILFORMULAR før vagten. */
 /* profil */
 .form{display:grid;gap:12px;max-width:520px}
@@ -226,8 +220,8 @@ canvas{width:100%;height:96px;display:block}
 </style>
 
 <!-- [H1] SIDESTRUKTUR. JavaScript fylder indholdet i de tomme elementer:
-     #card (kortet), #actions (knapperne), #ward (patientstuerne), #side (tegneserie)
-     og #tkTrack (top 5). Elementer findes med $("id"). -->
+     #side (tegneserie), #card (situationen), #count (nedtælling), #actions (svar),
+     #timeline (tidslinje) og #ward (patientstuerne). Elementer findes med $("id"). -->
 <div class="wrap">
   <header class="top">
     <div class="brand"><h1>En vagt som sygeplejerske</h1><span>Medicinsk afd. · dagvagt</span></div>
@@ -239,30 +233,31 @@ canvas{width:100%;height:96px;display:block}
     </div>
   </header>
 
-  <!-- [H2] Top 5-tickeren. Fyldes af renderTicker() [K13]. -->
-  <div class="ticker" id="ticker" aria-label="Top 5 spillere"><span class="tk-label">Top 5</span><div class="tk-view"><div class="tk-track" id="tkTrack"><span class="tk-item">Henter top 5 …</span></div></div></div>
-
-  <div class="timer" id="timer" role="progressbar" aria-label="Tid tilbage"><i id="timerBar"></i></div>
-
-  <!-- [H3] De tre rammer: monitor [K10], kort [K14] og tegneserie [K12]. -->
-  <main id="game">
-    <section class="stage">
-      <div class="monitor" id="monitor" aria-label="Patientmonitor">
-        <div class="mon-head"><span>Din puls · <b id="monRoom">Vagtstuen</b></span><span class="mon-alarm">● Alarm</span></div>
-        <div class="ecg-row">
-          <canvas id="ecg" aria-hidden="true"></canvas>
-          <div class="vital"><small>HR</small><strong id="hr">72</strong></div>
-        </div>
-        <div class="ecg-row">
-          <div class="note" style="color:var(--mon-text);font-size:12px" id="monNote">Pulsen stiger, når tiden løber.</div>
-          <div class="vital spo2"><small>STRESS</small><strong id="stressV">0</strong></div>
-        </div>
-        <div class="ward" id="ward"></div>
-      </div>
+  <!-- [H2] SPILLETS RAMMER oppefra og ned, som i skitsen:
+       1 billedet af situationen (tegneserie [K12])
+       2 situationen + nedtælling i tal [K14] [K15]
+       3 de fire svarmuligheder
+       4 tidslinjen for vagten [K13]
+       5 patientovervågningen med puls, stressindikator og de fire patienter [K10] -->
+  <main id="game" class="stage">
+    <section class="side" id="side" aria-label="Billedet af situationen"></section>
+    <div class="situ">
       <article class="card" id="card" aria-live="polite"></article>
-      <aside class="side" id="side" aria-label="Tegneserie og top 5"></aside>
+      <div class="count" id="count" role="timer" aria-label="Sekunder tilbage"><b id="countN">15</b><small>sek.</small></div>
+    </div>
+    <div class="actions" id="actions"></div>
+    <section class="timeline" id="timeline" aria-label="Tidslinje for vagten"></section>
+    <!-- [H3] PATIENTOVERVÅGNING: EKG og puls, stressindikator og de fire stuer. -->
+    <section class="monitor" id="monitor" aria-label="Patientovervågning">
+      <div class="mon-head"><span>Patientovervågning · <b id="monRoom">Vagtstuen</b></span><span class="mon-alarm">● Alarm</span></div>
+      <div class="ecg-row">
+        <canvas id="ecg" aria-hidden="true"></canvas>
+        <div class="vital"><small>DIN PULS</small><strong id="hr">72</strong></div>
+        <div class="vital spo2"><small>STRESS</small><strong id="stressV">0</strong></div>
+      </div>
+      <div class="note" style="color:var(--mon-text);font-size:12px" id="monNote">Pulsen stiger, når tiden løber.</div>
+      <div class="ward" id="ward"></div>
     </section>
-    <div class="actions" id="actions" style="margin-top:14px"></div>
   </main>
 
 </div>
@@ -476,6 +471,12 @@ const PEOPLE = {N:{c:"#0D6B68",cap:1},M:{c:"#6E5BC9",cap:1},C:{c:"#6E5BC9",cap:1
 const ANCHOR = {1:420,2:510,3:600,4:720,5:870};
 const DRIVERS = ["Patientens sikkerhed","Tiden","Reglerne","Mavefornemmelse"];
 const BLAME = ["Mig","Kollegaen","Systemet","Ledelsen"];
+/* Før/efter-spørgsmål til forskningsspørgsmålet: samme ordlyd før og efter vagten,
+   så ændringen kan måles pr. spiller (se docs/data.md). */
+const PREPOST = {
+  ansvar: {q:"Hvor stort ansvar har en sygeplejerske i løbet af en vagt?", sc:"1 = lille · 5 = meget stort"},
+  svaert: {q:"Hvor svært er det at træffe beslutninger som sygeplejerske?", sc:"1 = let · 5 = meget svært"}
+};
 
 /* [K6] TILSTAND. player = anonymt spiller-ID (gemt i browserens localStorage, så
    samme telefon genkendes). profile = profilsvarene. S = alt om den igangværende vagt:
@@ -486,23 +487,18 @@ const newId = () => "p" + Math.random().toString(36).slice(2,9);
 let player = "", profile = null;
 try{ player = localStorage.getItem("vagt-player") || ""; profile = JSON.parse(localStorage.getItem("vagt-profile")||"null"); }catch(e){}
 if(!player){ player = newId(); try{localStorage.setItem("vagt-player",player)}catch(e){} }
-const S = {attempt:1, game:"", path:"", node:null, phase:"start", hr:72, stress:0, t0:0, raf:0, fb:{}, end:{}, pending:null, hs:null};
+const S = {attempt:1, game:"", path:"", node:null, phase:"start", hr:72, stress:0, t0:0, raf:0, fb:{}, end:{}, pending:null};
 
 /* [K7] DATALAGET. google.script.run er Googles bro fra browseren til serverkoden.
    Data.save("Valg", række) kalder logRow() i Code.gs [G5], der skriver en række i
    Sheetet. Fejl ignoreres bevidst, så spillet aldrig går i stå pga. netværket.
-   [K8] loadHS() henter top 5 fra getHighscore() [G7].
-   flushPending() gemmer et game over-valg, når spilleren går videre (så svaret på
-   "hvem havde ansvaret" kommer med i samme række). */
+   [K8] flushPending() gemmer et game over-valg, når spilleren går videre (så svaret
+   på "hvem havde ansvaret" kommer med i samme række). */
 /* ---------- data (Google Apps Script) ---------- */
 const gs = () => (window.google && google.script && google.script.run) ? google.script.run : null;
 const Data = {
   save(sheet, row){ const r = gs(); if(!r) return; try{ r.withFailureHandler(()=>{}).logRow(sheet, row); }catch(e){} }
 };
-function loadHS(){
-  const r = gs(); if(!r) { S.hs = []; renderTicker(); return; }
-  try{ r.withSuccessHandler(d=>{ S.hs = d||[]; renderTicker(); }).withFailureHandler(()=>{ S.hs = []; renderTicker(); }).getHighscore(); }catch(e){}
-}
 function flushPending(){ if(S.pending){ Data.save("Valg", S.pending); S.pending = null; } }
 addEventListener("pagehide", flushPending);
 
@@ -516,7 +512,7 @@ function newPlayer(){
 }
 function newGame(){ S.game = "g"+Math.random().toString(36).slice(2,8); S.path=""; S.stress=0; S.fb={}; S.end={}; }
 
-/* [K10] PATIENTMONITOREN (venstre ramme).
+/* [K10] PATIENTOVERVÅGNINGEN (nederst).
    renderWard() tegner de fire stuer og fremhæver dem, situationen handler om.
    setVitals() sætter puls, stress og alarm. EKG-kurven tegnes løbende på et
    <canvas> med requestAnimationFrame; hastigheden følger pulsen (S.hr). */
@@ -588,7 +584,7 @@ function chips(){
   const c = $("chipWho"); c.hidden = !profile; if(profile) c.textContent = profile.nick;
 }
 function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
-function stopTimer(){ cancelAnimationFrame(S.raf); $("timer").classList.remove("on","low"); }
+function stopTimer(){ cancelAnimationFrame(S.raf); $("count").classList.remove("on","low"); }
 function opts(name, list, sel, labels){
   return `<div class="opts" data-q="${name}">${list.map((v,i)=>`<button type="button" class="opt ${sel==v?"sel":""}" data-v="${esc(v)}">${esc(labels?labels[i]:v)}</button>`).join("")}</div>`;
 }
@@ -606,7 +602,7 @@ function bindOpts(store, onChange){
 /* [K12] TEGNESERIEN tegnes som SVG direkte i koden (ingen billedfiler):
    person(), patientBed() og prop() tegner figurer og ting, panel() samler et panel
    med taleboble, der selv ombrydes til max 3 linjer. */
-/* ---------- comic + top 5 ---------- */
+/* ---------- comic + tidslinje ---------- */
 function wrap(t, n){ const w = t.split(" "), out=[""]; w.forEach(x=>{ if((out[out.length-1]+" "+x).trim().length>n && out[out.length-1]) out.push(x); else out[out.length-1]=(out[out.length-1]+" "+x).trim(); }); return out.slice(0,3); }
 function person(code, x){
   const p = PEOPLE[code]; const skin="#F2C9A5", hair = code==="C"||code==="O"||code==="D" ? "#3A2A20" : "#6B4A2E";
@@ -654,19 +650,24 @@ function panel(spec, i){
   return `<svg viewBox="0 0 260 140" role="img" aria-label="${esc(txt)}"><rect x="1" y="1" width="258" height="138" rx="6" fill="${bgs[i%3]}" stroke="#14232A" stroke-width="2"/><path d="M2 132 H258" stroke="#C9D6D8" stroke-width="2"/>${actor(l,66)}${actor(r,190)}${bubble}</svg>`;
 }
 /* [K13] renderSide() viser tegneserien for den aktuelle node.
-   renderTicker() bygger top 5-tickeren og sætter hastigheden efter antal navne. */
+   renderTimeline() tegner tidslinjen: 06.50 (410 min.) til 15.00 (900 min.), en prik
+   pr. runde ved rundens ur-anker (ANCHOR), farvet efter valget (A/B). Fyldet viser "nu",
+   og den aktuelle runde har en rød ring. */
 function renderSide(){
   const side = $("side"); if(!side) return;
   const key = (S.phase==="start"||S.phase==="profile"||!S.node) ? "START" : S.node;
   side.innerHTML = `<div class="strip">${(COMICS[key]||COMICS.START).map(panel).join("")}</div>`;
 }
-function renderTicker(){
-  const t = $("tkTrack"); if(!t) return;
-  const rows = S.hs || [];
-  const one = rows.length ? rows.map((r,i)=>`<span class="tk-item ${profile&&r.nick===profile.nick?"me":""}"><span class="rk">#${i+1}</span><b>${esc(r.nick)}</b><span>${r.korrekte} korrekte svar</span><span class="sep">·</span><span>${r.spil} spil</span>${r.gennemfoert?`<span class="sep">·</span><span>${r.gennemfoert} hele vagter</span>`:""}</span>`).join("")
-    : `<span class="tk-item">Ingen på listen endnu. Spil en vagt og bliv den første.</span>`;
-  t.innerHTML = one + one;
-  t.style.setProperty("--tk-dur", Math.max(20, rows.length*8) + "s");
+function renderTimeline(){
+  const t = $("timeline"); if(!t) return;
+  const START = 410, END = 900, pos = m => ((m-START)/(END-START)*100).toFixed(2)+"%";
+  const now = clockNow(), cur = S.node && !["start","profile","end"].includes(S.phase) ? roundOf(S.node) : 0;
+  const stops = [1,2,3,4,5].map(r=>{
+    const c = S.path[r-1] || "", cls = c ? c : (r===cur ? "cur" : "");
+    return `<div class="tl-stop ${cls}" style="left:${pos(ANCHOR[r])}" title="Kl. ${fmt(ANCHOR[r])} · ${esc(ROUNDS[r].theme)}">${c||r}<span>${esc(ROUNDS[r].theme)}</span></div>`;
+  }).join("");
+  t.innerHTML = `<div class="tl-head"><span>Kl. 06.50</span><span class="mid">Tidslinje · nu kl. ${fmt(now)}</span><span>Kl. 15.00</span></div>
+    <div class="tl-track"><div class="tl-fill" style="width:${pos(now)}"></div>${stops}</div>`;
 }
 
 /* [K14] render() – HJERTET I SPILLET. Tegner skærmen ud fra S.phase:
@@ -675,14 +676,14 @@ function renderTicker(){
      info      info-kortet: situationen læses, uret står stille
      stress    de 4 valg i tilfældig rækkefølge + 15 sek. nedtælling [K15]
      over      game over + "hvem havde ansvaret?"                      → gemmes i "Valg"
-     feedback  forklaring + stress, sikkerhed og "hvad styrede dit valg" → gemmes i "Valg"
-     end       slutprofil + 4 afsluttende spørgsmål                    → gemmes i "Slutninger" */
+     feedback  forklaring + pres, sikkerhed, følt ansvar og "hvad styrede dit valg" → "Valg"
+     end       slutprofil + før/efter-spørgsmål og refleksion          → gemmes i "Slutninger" */
 /* ---------- screens ---------- */
 function render(){
   chips();
   const card = $("card"), act = $("actions");
   act.className = "actions";
-  if(S.phase==="profile" || (S.phase==="start" && (!profile || !profile.erfaring))){
+  if(S.phase==="profile" || (S.phase==="start" && (!profile || !profile.ansvar_foer))){
     S.phase="profile";
     renderWard(""); setVitals(72,0,false,"Vagtstuen","Pulsen stiger, når tiden løber.");
     const p = profile || {};
@@ -701,6 +702,8 @@ function render(){
           <div class="field"><label for="int">Overvejer du et job i plejen?</label>${sel("int",["Ja","Måske","Nej"],p.interesse_foer)}</div>
         </div>
         <div class="field"><label for="ken">Hvor godt kender du plejepersonalets hverdag?</label>${sel("ken",["1 – slet ikke","2","3","4","5 – rigtig godt"],p.kendskab)}</div>
+        <div class="field"><label for="ansf">${PREPOST.ansvar.q}</label>${sel("ansf",["1 – lille","2","3","4","5 – meget stort"],p.ansvar_foer)}</div>
+        <div class="field"><label for="svf">${PREPOST.svaert.q}</label>${sel("svf",["1 – let","2","3","4","5 – meget svært"],p.svaert_foer)}</div>
         <div class="field"><label for="desc">Kort om dig <small>(frivilligt)</small></label><textarea id="desc" maxlength="200" placeholder="fx 1. semester, har arbejdet på plejehjem">${esc(p.desc||"")}</textarea></div>
         <div class="err" id="perr"></div>
       </form>
@@ -710,19 +713,18 @@ function render(){
     const submit = ()=>{
       const nick = $("nick").value.trim();
       if(nick.length<2){ $("perr").textContent="Skriv et kaldenavn på mindst 2 tegn."; $("nick").focus(); return; }
-      const miss = [["age","alder"],["bg","baggrund"],["erf","erfaring"],["int","job i plejen"],["ken","kendskab"]].filter(([id])=>!$(id).value);
+      const miss = [["age","alder"],["bg","baggrund"],["erf","erfaring"],["int","job i plejen"],["ken","kendskab"],["ansf","ansvar"],["svf","beslutninger"]].filter(([id])=>!$(id).value);
       if(miss.length){ $("perr").textContent = "Udfyld også: " + miss.map(m=>m[1]).join(", ") + "."; $(miss[0][0]).focus(); return; }
       if(!profile || profile.nick!==nick){ player = newId(); try{localStorage.setItem("vagt-player",player)}catch(e){} }
-      profile = {nick, age:$("age").value, bg:$("bg").value, erfaring:$("erf").value, interesse_foer:$("int").value, kendskab:$("ken").value.charAt(0), desc:$("desc").value.trim()};
+      profile = {nick, age:$("age").value, bg:$("bg").value, erfaring:$("erf").value, interesse_foer:$("int").value, kendskab:$("ken").value.charAt(0), ansvar_foer:$("ansf").value.charAt(0), svaert_foer:$("svf").value.charAt(0), desc:$("desc").value.trim()};
       try{ localStorage.setItem("vagt-profile", JSON.stringify(profile)); }catch(e){}
-      Data.save("Spillere",{player, nick:profile.nick, age:profile.age, bg:profile.bg, desc:profile.desc, erfaring:profile.erfaring, interesse_foer:profile.interesse_foer, kendskab:+profile.kendskab, ts:new Date().toISOString()});
+      Data.save("Spillere",{player, nick:profile.nick, age:profile.age, bg:profile.bg, desc:profile.desc, erfaring:profile.erfaring, interesse_foer:profile.interesse_foer, kendskab:+profile.kendskab, ansvar_foer:+profile.ansvar_foer, svaert_foer:+profile.svaert_foer, ts:new Date().toISOString()});
       S.phase="start"; render();
     };
     $("pform").onsubmit = e=>{ e.preventDefault(); submit(); };
-    ["nick","age","bg","erf","int","ken"].forEach(id=> $(id).addEventListener("input", ()=> $("perr").textContent=""));
+    ["nick","age","bg","erf","int","ken","ansf","svf"].forEach(id=> $(id).addEventListener("input", ()=> $("perr").textContent=""));
     $("psave").onclick = submit;
-    if(S.hs===null) loadHS();
-    renderSide();
+    renderSide(); renderTimeline();
     return;
   }
   if(S.phase==="start"){
@@ -740,7 +742,7 @@ function render(){
     act.innerHTML = `<button class="key primary" id="go">Start vagten</button><button class="key ghost" id="np">Ny spiller</button>`;
     $("go").onclick = ()=>{ newGame(); goNode("R1"); };
     $("np").onclick = newPlayer;
-    loadHS(); renderSide();
+    renderSide(); renderTimeline();
     return;
   }
   const n = N[S.node], r = roundOf(S.node), R = ROUNDS[r], focus = n.f + mentioned(n.sit);
@@ -778,7 +780,6 @@ function render(){
     act.innerHTML = `<button class="key primary" id="again">Start forfra</button><button class="key ghost" id="np">Ny spiller</button>`;
     $("again").onclick = ()=>{ flushPending(); S.attempt++; newGame(); goNode("R1"); };
     $("np").onclick = newPlayer;
-    loadHS();
   }
   else if(S.phase==="feedback"){
     renderWard(focus); setVitals(80+r*4, S.stress, false, R.room, "Træk vejret.");
@@ -791,6 +792,7 @@ function render(){
       <div class="qs">
         <div class="q"><b>Hvor presset følte du dig?</b><span class="sc">1 = rolig · 5 = panik</span>${opts("stress",[1,2,3,4,5],f.stress)}</div>
         <div class="q"><b>Hvor sikker var du på dit valg?</b><span class="sc">1 = gættede · 5 = helt sikker</span>${opts("sikkerhed",[1,2,3,4,5],f.sikkerhed)}</div>
+        <div class="q"><b>Hvor meget føltes beslutningen som dit ansvar?</b><span class="sc">1 = ikke mit · 5 = helt mit</span>${opts("ansvar_foelt",[1,2,3,4,5],f.ansvar_foelt)}</div>
         <div class="q"><b>Hvad styrede dit valg?</b>${opts("styret",DRIVERS,f.styret)}</div>
       </div>
       <div class="err" id="qerr"></div>`;
@@ -809,6 +811,9 @@ function render(){
       <div class="path" aria-label="Dine valg">${[...S.path].map(c=>`<span class="${c}">${c}</span>`).join("")}</div>
       <p>Du valgte systemet (A) ${a} gange og genvejen (B) ${5-a} gange. Ingen profil er fejlfri. Hver vej har en pris, og det er designet af arbejdsgangene, der bestemmer prisen.</p>
       ${S.saved ? `<p class="thanks">Tak for dine svar. De er gemt.</p>` : `<div class="qs">
+        <div class="q"><b>Nu hvor du har prøvet det: ${PREPOST.ansvar.q.charAt(0).toLowerCase()+PREPOST.ansvar.q.slice(1)}</b><span class="sc">${PREPOST.ansvar.sc}</span>${opts("ansvar_efter",[1,2,3,4,5],e.ansvar_efter)}</div>
+        <div class="q"><b>Og: ${PREPOST.svaert.q.charAt(0).toLowerCase()+PREPOST.svaert.q.slice(1)}</b><span class="sc">${PREPOST.svaert.sc}</span>${opts("svaert_efter",[1,2,3,4,5],e.svaert_efter)}</div>
+        <div class="q"><b>Hvor virkelig føltes vagten?</b><span class="sc">1 = slet ikke · 5 = som en rigtig vagt</span>${opts("realisme",[1,2,3,4,5],e.realisme)}</div>
         <div class="q"><b>Hvilket dilemma var sværest?</b>${opts("svaerest",[1,2,3,4,5],e.svaerest,["Runde 1","Runde 2","Runde 3","Runde 4","Runde 5"])}</div>
         <div class="q"><b>Har spillet ændret dit syn på plejepersonalets ansvar?</b><span class="sc">1 = slet ikke · 5 = meget</span>${opts("synsaendring",[1,2,3,4,5],e.synsaendring)}</div>
         <div class="q"><b>Overvejer du nu et job i plejen?</b>${opts("interesse_efter",["Ja","Måske","Nej"],e.interesse_efter)}</div>
@@ -820,30 +825,31 @@ function render(){
       : `<button class="key primary" id="send">Gem mine svar</button><button class="key ghost" id="np">Ny spiller</button>`;
     if(S.saved) $("again").onclick = ()=>{ S.attempt=1; S.saved=false; newGame(); S.node=null; S.phase="start"; render(); };
     else $("send").onclick = ()=>{
-      const m = [["svaerest","sværeste dilemma"],["synsaendring","syn på ansvar"],["interesse_efter","job i plejen"]].filter(([k])=>!S.end[k]);
+      const m = [["ansvar_efter","ansvar"],["svaert_efter","beslutninger"],["realisme","hvor virkelig"],["svaerest","sværeste dilemma"],["synsaendring","syn på ansvar"],["interesse_efter","job i plejen"]].filter(([k])=>!S.end[k]);
       if(m.length){ $("qerr").textContent = "Svar på: " + m.map(x=>x[1]).join(", ") + "."; return; }
       S.end.overrasket = $("surp").value.trim();
-      Data.save("Slutninger",{player, nick:profile.nick, game:S.game, attempt:S.attempt, path:S.path, profile:prof, svaerest:+S.end.svaerest, synsaendring:+S.end.synsaendring, interesse_efter:S.end.interesse_efter, overrasket:S.end.overrasket, ts:new Date().toISOString()});
-      S.saved = true; loadHS(); render();
+      Data.save("Slutninger",{player, nick:profile.nick, game:S.game, attempt:S.attempt, path:S.path, profile:prof, svaerest:+S.end.svaerest, synsaendring:+S.end.synsaendring, interesse_efter:S.end.interesse_efter, overrasket:S.end.overrasket, ansvar_efter:+S.end.ansvar_efter, svaert_efter:+S.end.svaert_efter, realisme:+S.end.realisme, ts:new Date().toISOString()});
+      S.saved = true; render();
     };
     $("np").onclick = ()=>{ S.saved=false; newPlayer(); };
   }
-  renderSide();
+  renderSide(); renderTimeline();
 }
 
 /* Skift til en ny node og vis dens info-kort. */
 function goNode(id){ S.node = id; S.phase = "info"; S.fb = {}; render(); window.scrollTo({top:0,behavior:"smooth"}); }
 
-/* [K15] NEDTÆLLINGEN. Måler svartid i millisekunder og hæver pulsen, jo mindre tid der er
+/* [K15] NEDTÆLLINGEN. Tælleren viser hele sekunder tilbage (15 → 0) og bliver rød de sidste
+   5 sekunder. Svartiden måles i millisekunder, og pulsen stiger, jo mindre tid der er
    tilbage. Når tiden er gået, kaldes choose("timeout") = game over ("så døde baby"). */
 function startTimer(){
   S.t0 = performance.now();
-  const tm = $("timer"), bar = $("timerBar"); tm.classList.add("on"); tm.classList.remove("low");
+  const tm = $("count"), num = $("countN"); tm.classList.add("on"); tm.classList.remove("low"); num.textContent = SECONDS;
   const r = roundOf(S.node), base = 95 + r*6;
   const tick = now=>{
     const left = Math.max(0, 1 - (now-S.t0)/(SECONDS*1000));
-    bar.style.transform = `scaleX(${left})`;
-    tm.classList.toggle("low", left < .34);
+    num.textContent = Math.ceil(left*SECONDS);
+    tm.classList.toggle("low", left*SECONDS <= 5);
     S.hr = base + (1-left)*45; $("hr").textContent = Math.round(S.hr);
     if(left<.34) $("monitor").classList.add("alarm");
     if(left<=0){ choose("timeout"); return; }
@@ -854,7 +860,7 @@ function startTimer(){
 
 /* [K16] row() bygger én datarække (én beslutning). choose() håndterer et valg:
    timeout og X1/X2 = game over, A/B = videre til feedback. Svartiden (ms) måles her. */
-function row(r,k,out,ms){ return {player, nick:profile?profile.nick:"", game:S.game, attempt:S.attempt, node:S.node, round:r, choice:k, outcome:out, ms, stress:"", sikkerhed:"", styret:"", ansvar:"", ts:new Date().toISOString()}; }
+function row(r,k,out,ms){ return {player, nick:profile?profile.nick:"", game:S.game, attempt:S.attempt, node:S.node, round:r, choice:k, outcome:out, ms, stress:"", sikkerhed:"", styret:"", ansvar:"", ansvar_foelt:"", ts:new Date().toISOString()}; }
 function choose(k){
   if(S.phase!=="stress") return;
   stopTimer();
@@ -875,14 +881,14 @@ function choose(k){
   S.phase="feedback"; render();
 }
 
-/* [K17] rate() kontrollerer at de tre spørgsmål er besvaret, gemmer rækken og går til
+/* [K17] rate() kontrollerer at de fire spørgsmål er besvaret, gemmer rækken og går til
    næste node (R{runde+1}-{vej}) eller til slutskærmen efter runde 5. */
 function rate(){
   if(S.phase!=="feedback") return;
-  const m = [["stress","pres"],["sikkerhed","sikkerhed"],["styret","hvad der styrede dit valg"]].filter(([k])=>!S.fb[k]);
+  const m = [["stress","pres"],["sikkerhed","sikkerhed"],["ansvar_foelt","ansvar"],["styret","hvad der styrede dit valg"]].filter(([k])=>!S.fb[k]);
   if(m.length){ $("qerr").textContent = "Svar på: " + m.map(x=>x[1]).join(", ") + "."; return; }
   S.phase="rated";
-  Object.assign(S.last.row, {stress:+S.fb.stress, sikkerhed:+S.fb.sikkerhed, styret:S.fb.styret});
+  Object.assign(S.last.row, {stress:+S.fb.stress, sikkerhed:+S.fb.sikkerhed, ansvar_foelt:+S.fb.ansvar_foelt, styret:S.fb.styret});
   Data.save("Valg", S.last.row);
   S.stress = Math.min(99, S.stress + S.fb.stress*2);
   const r = roundOf(S.node);
@@ -891,7 +897,7 @@ function rate(){
 }
 
 /* [K18] SMÅ HÆNDELSER: mus over et patientnavn lyser stuen op, klik på kaldenavnet
-   skifter profil, tasterne 1-4 vælger svar. Til sidst: første render og top 5 hvert minut. */
+   skifter profil, tasterne 1-4 vælger svar. Til sidst: første render(). */
 document.addEventListener("mouseover", e=>{
   const p = e.target.closest && e.target.closest(".pt");
   document.querySelectorAll(".bed.hot").forEach(b=>b.classList.remove("hot"));
@@ -902,5 +908,4 @@ addEventListener("keydown", e=>{
   if(S.phase==="stress" && /^[1-4]$/.test(e.key)){ const b = $("actions").querySelectorAll(".key")[+e.key-1]; b && b.click(); }
 });
 render();
-loadHS(); setInterval(loadHS, 60000);
 </script>
