@@ -1,0 +1,906 @@
+<!--
+================================================================================
+  EN VAGT SOM SYGEPLEJERSKE · index.html  (selve spillet)
+  RUC · Digital Transformation · Designmetoder og Teknologi · Workshop #3
+--------------------------------------------------------------------------------
+  Hvad er det?   Et interaktivt beslutningsspil, hvor spilleren tager en dagvagt
+                 som sygeplejerske (kl. 06.50-15.00) og træffer valg under pres.
+  Hvorfor?       Prototypen er et designeksperiment (Research through Design):
+                 vi undersøger, hvordan unge oplever ansvar og dilemmaer i plejen,
+                 og hvordan digitale systemer former beslutningerne.
+  Hvordan?       Én HTML-fil med CSS og JavaScript. Ingen frameworks.
+                 Filen serveres af Google Apps Script (se Code.gs) og sender
+                 hvert valg til et Google Sheet via google.script.run.
+
+  Læsevejledning: Koden er delt i nummererede afsnit. Numrene bruges også i
+  docs/kodeguide.md, så man kan slå op fra dokumentationen til koden.
+     [S1]-[S9]   = udseende (CSS)        [H1]-[H3]   = struktur (HTML)
+     [K1]-[K18]  = funktioner (JavaScript)
+================================================================================
+-->
+<title>En vagt som sygeplejerske</title>
+<meta name="claude:viewport-fit-sides" content="cover">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* [S1] DESIGN-TOKENS OG TEMA
+   Alle farver er defineret som CSS-variabler (--navn) ét sted. Resten af koden
+   bruger kun variablerne, så lys/mørk tilstand og farveskift kan styres her.
+   --mon-*  = patientmonitorens farver (altid mørk, som en rigtig skærm).       */
+/* Layout: a ward workstation. Patient monitor left, the card's text right, four action keys along the bottom. Stacks on phones. */
+:root{
+  --bg:#E9EFF0; --surface:#FFFFFF; --ink:#14232A; --muted:#55686F; --line:#CCD8DB;
+  --accent:#0D6B68; --accent-ink:#FFFFFF; --accent-soft:#D6EBE9;
+  --alarm:#C2302A; --alarm-soft:#F8DEDB; --warn:#9A6200; --warn-soft:#F6E7C8;
+  --mon-bg:#0A1315; --mon-line:#1E3034; --mon-ecg:#43D693; --mon-spo2:#4CC3E8; --mon-text:#B9CACD; --mon-alarm:#FF5A4E;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+  --r:10px;
+}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){
+  --bg:#0E1619; --surface:#16232A; --ink:#E3ECEE; --muted:#93A6AC; --line:#2A3B41;
+  --accent:#3FB7AF; --accent-ink:#06201F; --accent-soft:#163A39;
+  --alarm:#FF6B60; --alarm-soft:#3A1A19; --warn:#E3A93A; --warn-soft:#3A2C12; color-scheme:dark}}
+:root[data-theme="dark"]{
+  --bg:#0E1619; --surface:#16232A; --ink:#E3ECEE; --muted:#93A6AC; --line:#2A3B41;
+  --accent:#3FB7AF; --accent-ink:#06201F; --accent-soft:#163A39;
+  --alarm:#FF6B60; --alarm-soft:#3A1A19; --warn:#E3A93A; --warn-soft:#3A2C12; color-scheme:dark}
+html,body{background:var(--bg);color:var(--ink)}
+body{font-family:var(--body);font-size:16px;line-height:1.55;padding-left:max(16px,env(safe-area-inset-left,0px));padding-right:max(16px,env(safe-area-inset-right,0px));padding-block:14px 28px}
+.wrap{max-width:1360px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+button{font:inherit;color:inherit;cursor:pointer}
+button:focus-visible{outline:3px solid var(--accent);outline-offset:2px}
+h1,h2,h3{font-family:var(--display);font-weight:700;letter-spacing:.01em;text-wrap:balance;margin:0;line-height:1.05}
+
+/* [S2] TOPBJÆLKE: titel og små 'chips' med runde, klokkeslæt, forsøg og spiller. */
+/* header */
+.top{display:flex;flex-wrap:wrap;align-items:center;gap:10px 14px;justify-content:space-between}
+.brand{display:flex;align-items:baseline;gap:10px;min-width:0}
+.brand h1{font-size:clamp(24px,4vw,34px)}
+.brand span{font-family:var(--display);font-weight:500;color:var(--muted);font-size:18px;letter-spacing:.06em;text-transform:uppercase}
+.chips{display:flex;flex-wrap:wrap;gap:8px}
+.chip{font-family:var(--mono);font-size:13px;padding:5px 10px;border:1px solid var(--line);border-radius:999px;background:var(--surface);font-variant-numeric:tabular-nums;white-space:nowrap}
+.chip.btn{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);font-family:var(--display);font-weight:600;font-size:15px;letter-spacing:.04em}
+
+/* [S3] TOP 5-TICKER: 30 px bjælke der ruller fra højre mod venstre.
+   Indholdet ligger to gange efter hinanden, og animationen flytter det -50 %,
+   så rulningen ser uendelig ud. Stopper ved mus-over og ved 'reduceret bevægelse'. */
+/* top 5-ticker */
+.ticker{height:30px;display:flex;align-items:center;background:var(--mon-bg);color:var(--mon-text);border:1px solid var(--mon-line);border-radius:6px;overflow:hidden;font-family:var(--mono);font-size:13px}
+.tk-label{flex:none;height:100%;display:flex;align-items:center;padding:0 12px;background:var(--accent);color:var(--accent-ink);font-family:var(--display);font-weight:700;font-size:15px;letter-spacing:.08em;text-transform:uppercase}
+.tk-view{flex:1;min-width:0;overflow:hidden;height:100%;display:flex;align-items:center}
+.tk-track{display:flex;width:max-content;white-space:nowrap;animation:tk var(--tk-dur,40s) linear infinite}
+.tk-view:hover .tk-track{animation-play-state:paused}
+.tk-item{padding:0 22px;display:inline-flex;gap:8px;align-items:baseline}
+.tk-item b{color:#fff}
+.tk-item .rk{color:var(--mon-ecg);font-weight:700}
+.tk-item.me b{color:var(--mon-spo2)}
+.tk-item .sep{color:var(--mon-line)}
+@keyframes tk{from{transform:translateX(0)}to{transform:translateX(-50%)}}
+@media (prefers-reduced-motion:reduce){.tk-view{overflow-x:auto}.tk-track{animation:none}}
+
+/* [S4] NEDTÆLLING: vandret bjælke der skrumper på 15 sek. og bliver rød til sidst. */
+/* timer */
+.timer{height:8px;border-radius:4px;background:var(--line);overflow:hidden;visibility:hidden}
+.timer.on{visibility:visible}
+.timer i{display:block;height:100%;width:100%;background:var(--accent);transform-origin:left;transition:background .3s}
+.timer.low i{background:var(--alarm)}
+
+/* [S5] SPILLETS TRE RAMMER: monitor (venstre) · kort (midt) · tegneserie (højre).
+   Responsivt: under 1100 px flyttes tegneserien ned, under 760 px stables alt. */
+/* stage */
+.stage{display:grid;grid-template-columns:minmax(0,.85fr) minmax(0,1.15fr) minmax(220px,280px);gap:14px;align-items:start}
+@media (max-width:1100px){.stage{grid-template-columns:minmax(0,.92fr) minmax(0,1.08fr)}.side{grid-column:1/-1}.side .strip{flex-direction:row}.side .strip svg{min-width:0}}
+@media (max-width:760px){.stage{grid-template-columns:1fr}.side .strip{overflow-x:auto;scroll-snap-type:x mandatory;padding-bottom:4px}.side .strip svg{min-width:230px;scroll-snap-align:start}.brand span{display:none}}
+
+.monitor{background:var(--mon-bg);color:var(--mon-text);border-radius:var(--r);padding:14px;display:flex;flex-direction:column;gap:12px;min-width:0;border:1px solid var(--mon-line)}
+.mon-head{display:flex;justify-content:space-between;align-items:baseline;font-family:var(--mono);font-size:12px;letter-spacing:.08em;text-transform:uppercase}
+.mon-head b{color:#fff;font-weight:700}
+.mon-alarm{color:var(--mon-alarm);visibility:hidden}
+.monitor.alarm .mon-alarm{visibility:visible;animation:blink .8s steps(2) infinite}
+@keyframes blink{50%{opacity:0}}
+.ecg-row{display:grid;grid-template-columns:1fr auto;gap:12px;align-items:center}
+canvas{width:100%;height:96px;display:block}
+.vital{font-family:var(--mono);text-align:right;line-height:1}
+.vital small{display:block;font-size:11px;letter-spacing:.1em;color:var(--mon-text)}
+.vital strong{font-size:44px;font-weight:700;color:var(--mon-ecg);font-variant-numeric:tabular-nums}
+.vital.spo2 strong{color:var(--mon-spo2);font-size:28px}
+.monitor.alarm .vital strong{color:var(--mon-alarm)}
+.ward{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:8px}
+.bed{border:1px solid var(--mon-line);border-left:5px solid var(--pc);border-radius:8px;padding:8px 10px;font-size:13px;line-height:1.3;transition:border-color .3s,background .3s}
+.bed .no{font-family:var(--mono);font-size:11px;letter-spacing:.08em;opacity:.75}
+.bed .nm{color:#fff;font-weight:700;display:flex;align-items:center;gap:6px}
+.bed .dot{width:10px;height:10px;border-radius:50%;background:var(--pc);flex:none}
+.bed.hot{outline:2px solid var(--pc);outline-offset:2px;background:rgba(255,255,255,.08)}
+.bed.focus{border-color:var(--pc);background:rgba(255,255,255,.07)}
+.monitor.alarm .bed.focus{border-color:var(--mon-alarm);background:rgba(255,90,78,.1)}
+.monitor.alarm .bed.focus .dot{background:var(--mon-alarm);animation:blink .6s steps(2) infinite}
+
+/* [S6] KORTET i midten: info-, stress-, feedback-, game over- og slutkort. */
+.card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:clamp(16px,3vw,26px);display:flex;flex-direction:column;gap:12px;min-width:0}
+.tag{align-self:flex-start;font-family:var(--display);font-weight:700;font-size:14px;letter-spacing:.12em;text-transform:uppercase;padding:3px 10px;border-radius:4px}
+.tag.info{background:var(--accent-soft);color:var(--accent)}
+.tag.stress{background:var(--alarm-soft);color:var(--alarm)}
+.tag.feedback{background:var(--warn-soft);color:var(--warn)}
+.tag.over{background:var(--alarm);color:#fff}
+.tag.end{background:var(--accent);color:var(--accent-ink)}
+.card h2{font-size:clamp(28px,4.4vw,40px)}
+.card .meta{font-family:var(--mono);font-size:13px;color:var(--muted)}
+.card p{margin:0;max-width:62ch}
+.card .lead{font-size:18px}
+.quote{border-left:3px solid var(--line);padding-left:12px;color:var(--muted);border-radius:0}
+.big-x{font-family:var(--display);font-weight:700;font-size:clamp(44px,8vw,72px);color:var(--alarm);line-height:.95}
+
+/* [S7] HANDLINGSKNAPPER: de fire valg og de store 'videre'-knapper. */
+/* actions */
+.actions{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+@media (max-width:760px){.actions{grid-template-columns:repeat(2,minmax(0,1fr))}}
+.actions.one{grid-template-columns:1fr}
+.actions.five{grid-template-columns:repeat(5,minmax(0,1fr))}
+.key{background:var(--surface);border:1.5px solid var(--line);border-radius:var(--r);padding:14px;text-align:left;min-height:86px;display:flex;flex-direction:column;gap:6px;transition:border-color .15s,transform .1s}
+.key:hover{border-color:var(--accent)}
+.key:active{transform:translateY(1px)}
+.key .k{font-family:var(--mono);font-size:12px;color:var(--muted);letter-spacing:.08em}
+.key .t{font-size:15px;line-height:1.35}
+.key.primary{background:var(--accent);color:var(--accent-ink);border-color:var(--accent);min-height:60px;align-items:center;justify-content:center;font-family:var(--display);font-weight:700;font-size:22px;letter-spacing:.04em}
+.key.rate{align-items:center;justify-content:center;min-height:64px;text-align:center}
+.key.rate .n{font-family:var(--display);font-weight:700;font-size:28px}
+.key.rate .t{font-size:12px;color:var(--muted)}
+.key.rate.sel{border-color:var(--accent);background:var(--accent-soft)}
+.key[disabled]{opacity:.45;cursor:default}
+
+/* intro + end */
+.rules{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin:4px 0 0;padding:0;list-style:none}
+@media (max-width:560px){.rules{grid-template-columns:1fr}}
+.rules li{border:1px solid var(--line);border-radius:8px;padding:10px 12px;font-size:14px}
+.rules b{display:block;font-family:var(--display);font-size:20px;color:var(--accent)}
+.path{display:flex;gap:6px;flex-wrap:wrap}
+.path span{font-family:var(--mono);font-weight:700;width:34px;height:34px;display:grid;place-items:center;border-radius:6px;border:1px solid var(--line)}
+.path span.A{background:var(--accent-soft);color:var(--accent);border-color:transparent}
+.path span.B{background:var(--warn-soft);color:var(--warn);border-color:transparent}
+.note{font-size:13px;color:var(--muted)}
+
+/* [S8] PATIENTNAVNE i teksten (farvet 'pille' med stuenummer), forskningsspørgsmål
+   (knaprækker .opts) og tegneserie-kolonnen. */
+/* patient-navne, spørgsmål, side */
+.pt{display:inline-flex;align-items:baseline;gap:4px;background:color-mix(in srgb,var(--pc) 28%,transparent);border-bottom:2px solid var(--pc);border-radius:4px;padding:0 4px;font-weight:700;white-space:nowrap}
+.pt i{font-style:normal;font-family:var(--mono);font-size:.7em;font-weight:500;opacity:.8}
+.qs{display:grid;gap:12px;border-top:1px solid var(--line);padding-top:12px}
+.q{display:grid;gap:6px}
+.q .sc{font-size:13px;color:var(--muted)}
+.opts{display:flex;flex-wrap:wrap;gap:6px}
+.opt{border:1.5px solid var(--line);background:var(--bg);border-radius:8px;padding:8px 12px;min-width:44px;font-size:15px}
+.opt:hover{border-color:var(--accent)}
+.opt.sel{background:var(--accent);border-color:var(--accent);color:var(--accent-ink)}
+.thanks{color:var(--accent);font-weight:700}
+.actions.two{grid-template-columns:2fr 1fr}
+@media (max-width:760px){.actions.two{grid-template-columns:1fr}}
+.key.ghost{min-height:60px;align-items:center;justify-content:center;font-family:var(--display);font-weight:600;font-size:18px}
+.side{display:flex;flex-direction:column;gap:12px;min-width:0}
+.strip{display:flex;flex-direction:column;gap:8px}
+.strip svg{width:100%;height:auto;display:block}
+.hs{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:14px;display:grid;gap:8px}
+.hs-h{font-family:var(--display);font-weight:700;font-size:22px}
+.hs ol{list-style:none;margin:0;padding:0;display:grid;gap:6px}
+.hs li{display:grid;grid-template-columns:24px 1fr;gap:2px 8px;align-items:baseline;padding:6px 8px;border-radius:8px;background:var(--bg)}
+.hs li.me{outline:2px solid var(--accent)}
+.hs .rk{font-family:var(--mono);font-weight:700;color:var(--accent);grid-row:span 2}
+.hs .nk{font-weight:700;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hs .st{font-size:12px;color:var(--muted)}
+.hs .st b{color:var(--ink)}
+/* [S9] PROFILFORMULAR før vagten. */
+/* profil */
+.form{display:grid;gap:12px;max-width:520px}
+.field{display:grid;gap:4px}
+.field label{font-family:var(--display);font-weight:600;font-size:17px;letter-spacing:.03em}
+.field small{color:var(--muted);font-size:13px}
+.field input,.field select,.field textarea{font:inherit;color:var(--ink);background:var(--bg);border:1.5px solid var(--line);border-radius:8px;padding:10px 12px;width:100%;box-sizing:border-box}
+.field textarea{min-height:70px;resize:vertical}
+.field input:focus,.field select:focus,.field textarea:focus{outline:none;border-color:var(--accent)}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+@media (max-width:480px){.row2{grid-template-columns:1fr}}
+.err{color:var(--alarm);font-size:13px;min-height:1em}
+/* results */
+.results{display:flex;flex-direction:column;gap:14px}
+.res-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,300px),1fr));gap:14px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.panel h3{font-size:22px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.kpi b{display:block;font-family:var(--display);font-size:34px;font-variant-numeric:tabular-nums;line-height:1.1}
+.kpi span{font-size:13px;color:var(--muted)}
+.bar-row{display:grid;grid-template-columns:72px minmax(0,1fr) 56px;gap:10px;align-items:center;font-size:14px}
+.bar-row .lbl{font-family:var(--mono);font-size:13px}
+.bar-row .val{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+.bar{height:16px;border-radius:4px;background:var(--line);overflow:hidden;display:flex}
+.bar .a{background:var(--accent)} .bar .b{background:var(--warn)} .bar .x{background:var(--alarm)}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.qr{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+.qr #qrbox{background:#fff;padding:10px;border-radius:8px;line-height:0}
+.qr .url{font-family:var(--mono);font-size:13px;word-break:break-all;user-select:all}
+.empty{color:var(--muted);font-size:15px}
+
+@media (prefers-reduced-motion:reduce){*{animation:none!important;transition:none!important}}
+</style>
+
+<!-- [H1] SIDESTRUKTUR. JavaScript fylder indholdet i de tomme elementer:
+     #card (kortet), #actions (knapperne), #ward (patientstuerne), #side (tegneserie)
+     og #tkTrack (top 5). Elementer findes med $("id"). -->
+<div class="wrap">
+  <header class="top">
+    <div class="brand"><h1>En vagt som sygeplejerske</h1><span>Medicinsk afd. · dagvagt</span></div>
+    <div class="chips">
+      <span class="chip" id="chipRound">Runde –/5</span>
+      <span class="chip" id="chipClock">Kl. 06.55</span>
+      <span class="chip" id="chipTry">Forsøg 1</span>
+      <button class="chip" id="chipWho" title="Skift profil" hidden></button>
+    </div>
+  </header>
+
+  <!-- [H2] Top 5-tickeren. Fyldes af renderTicker() [K13]. -->
+  <div class="ticker" id="ticker" aria-label="Top 5 spillere"><span class="tk-label">Top 5</span><div class="tk-view"><div class="tk-track" id="tkTrack"><span class="tk-item">Henter top 5 …</span></div></div></div>
+
+  <div class="timer" id="timer" role="progressbar" aria-label="Tid tilbage"><i id="timerBar"></i></div>
+
+  <!-- [H3] De tre rammer: monitor [K10], kort [K14] og tegneserie [K12]. -->
+  <main id="game">
+    <section class="stage">
+      <div class="monitor" id="monitor" aria-label="Patientmonitor">
+        <div class="mon-head"><span>Din puls · <b id="monRoom">Vagtstuen</b></span><span class="mon-alarm">● Alarm</span></div>
+        <div class="ecg-row">
+          <canvas id="ecg" aria-hidden="true"></canvas>
+          <div class="vital"><small>HR</small><strong id="hr">72</strong></div>
+        </div>
+        <div class="ecg-row">
+          <div class="note" style="color:var(--mon-text);font-size:12px" id="monNote">Pulsen stiger, når tiden løber.</div>
+          <div class="vital spo2"><small>STRESS</small><strong id="stressV">0</strong></div>
+        </div>
+        <div class="ward" id="ward"></div>
+      </div>
+      <article class="card" id="card" aria-live="polite"></article>
+      <aside class="side" id="side" aria-label="Tegneserie og top 5"></aside>
+    </section>
+    <div class="actions" id="actions" style="margin-top:14px"></div>
+  </main>
+
+</div>
+
+<script>
+/* =============================================================================
+   JAVASCRIPT
+   Spillet er en lille "tilstandsmaskine": variablen S.phase fortæller, hvilken
+   skærm der vises (profile → start → info → stress → feedback/over → ... → end),
+   og funktionen render() [K14] tegner skærmen ud fra den.
+   ============================================================================= */
+
+/* [K1] GRUNDOPSÆTNING: tid pr. valg, de fire patienter og de fem runder. */
+const SECONDS = 15;
+
+const PATIENTS = {
+  J:{no:"Stue 1",nm:"Hr. Jensen",info:"78 år · KOL · får ilt"},
+  H:{no:"Stue 2",nm:"Fru Hansen",info:"84 år · hoftebrud · let dement"},
+  A:{no:"Stue 3",nm:"Ahmed",info:"45 år · type 1-diabetes"},
+  B:{no:"Stue 4",nm:"Birthe",info:"67 år · lungebetændelse"}
+};
+const ROUNDS = {1:{time:"07.00",theme:"Overlevering",room:"Vagtstuen"},2:{time:"08.30",theme:"Medicinrunden",room:"Medicinrummet"},3:{time:"10.00",theme:"Alarmer",room:"Gangen"},4:{time:"12.00",theme:"Pårørende vs. skærmen",room:"Kontoret"},5:{time:"14.30",theme:"Udskrivelse og vagtskifte",room:"Kontoret"}};
+
+/* [K2] HISTORIETRÆET – spillets indhold.
+   Hver nøgle er et "node-ID", der fortæller vejen hertil:
+     R1        = runde 1 (alle starter her)
+     R3-AB     = runde 3, efter valg A i runde 1 og B i runde 2
+   Hver node har:
+     f      = hvilke patienter (J/H/A/B) situationen handler om (lyser på monitoren)
+     alarm  = 1 hvis monitoren skal blinke rødt
+     title, sit = overskrift og situation (info-kortet)
+     c      = de fire valg: A og B fører videre, X1 og X2 er "skøre" og giver game over
+     fb     = feedback-teksten, der kobler situationen til digital transformation
+   2 rigtige valg pr. runde i 5 runder = 31 noder og 32 mulige slutninger.        */
+// c: [tekst, udfald, type] — type 'død' eller 'fyret' for de skøre valg
+const N = {
+"R1":{f:"JHAB",title:"Den krøllede seddel",sit:"Nattevagten Mette skal hente børn og har 4 minutter. Hun rækker dig en krøllet seddel med 4 patienter. Sundhedsplatformen opdaterer og er langsom.",
+ c:{A:["Bed Mette blive 5 minutter, så I gennemgår patienterne i systemet sammen. Du starter 10 minutter bagud."],B:["Tag sedlen og den mundtlige overlevering, og kom i gang med det samme."],X1:["Sig \"jeg kan huske det hele\" og smid sedlen ud.","Kl. 9 får Hr. Jensen Fru Hansens morfin.","fyret"],X2:["Start dagen med en rolig kop kaffe i personalestuen.","Ahmed fik aldrig sin insulin.","død"]},
+ fb:"Overlevering er et af de steder, hvor flest fejl opstår. Informationen ligger på papir, i systemet og i hovedet på en, der er ved at gå hjem. Et digitalt værktøj hjælper kun, hvis det kan bruges på de 4 minutter, folk faktisk har."},
+"R2-A":{f:"H",title:"Scanneren siger nej",sit:"Du kender alle patienter, men er 10 minutter bagud. Fru Hansens armbånd er udvisket, og scanneren bipper \"fejl\". Hun har ondt og spørger efter sin pille.",
+ c:{A:["Print et nyt armbånd på printeren ude på gangen og scan korrekt. Koster 6 minutter."],B:["Tjek navn og CPR mundtligt, giv medicinen og dokumentér manuelt bagefter."],X1:["Giv pillen til den patient, der ligner mest.","Hr. Jensen sover resten af dagen.","fyret"],X2:["Giv hele dagens medicin på én gang, så er den runde klaret.","Overdosis.","død"]},
+ fb:"Scanning af armbånd mindsker medicinfejl. Men når udstyret driller, opfinder personalet workarounds. Spørgsmålet er, om systemet er designet til den gode dag eller den travle."},
+"R2-B":{f:"H",title:"Spørgsmålstegnet",sit:"Du er hurtigt i gang. På sedlen står: \"Fru H. smertestillende kl. 6?\" Med spørgsmålstegn. Fru Hansen har ondt og kan ikke selv huske det.",
+ c:{A:["Log ind i medicinmodulet og tjek. Login tager 4 minutter i dag."],B:["Ring til Mette, der sidder i bilen på vej hjem."],X1:["Giv dobbelt dosis, så er du på den sikre side.","Hun vågner ikke igen.","død"],X2:["Brug Dr. Holms login, der står åbent på computeren, og ordinér selv.","Logningen afslører dig samme eftermiddag.","fyret"]},
+ fb:"\"Er det givet eller ej?\" er en klassisk usikkerhed. Når informationen kun findes på en seddel eller hos en kollega, der er gået hjem, bliver sygeplejersken detektiv i stedet for sygeplejerske."},
+"R3-AA":{f:"JAH",alarm:1,title:"Tre alarmer på én gang",sit:"Alt er dokumenteret korrekt, men du er nu 16 minutter bagud. På én gang: Hr. Jensens iltmåler alarmerer, Ahmed trykker på klokken, og Fru Hansens sengealarm hyler.",
+ c:{A:["Følg alarmsystemets prioritering: ilt først."],B:["Kald Jonas ind fra gangen og del alarmerne mellem jer."],X1:["Sluk alle alarmer på centralen, så der er ro til at tænke.","Ingen opdager, at Hr. Jensens ilt falder.","død"],X2:["Lad dem ringe. De plejer at være falske.","Fru Hansen falder og brækker den anden hofte.","fyret"]},
+ fb:"Alarmtræthed er virkelig: mange alarmer er falske, så hjernen lærer at overhøre dem. Flere alarmer giver ikke mere sikkerhed, hvis de ikke er designet til at blive prioriteret."},
+"R3-AB":{f:"A",alarm:1,title:"Den røde advarsel",sit:"Din manuelle medicingivning står nu som en rød advarsel i systemet: \"Medicin ikke scannet\". Samtidig ringer Ahmed. Hans blodsukker er 3,1, og han sveder.",
+ c:{A:["Slå instruksen for lavt blodsukker op i systemet (2 minutter) og følg den trin for trin."],B:["Giv Ahmed juice med det samme. Du kender proceduren. Dokumentér bagefter."],X1:["Giv Ahmed insulin. Han er jo diabetiker.","Blodsukkeret styrtdykker.","død"],X2:["Skriv først en klage over scanneren, mens irritationen er frisk.","Ahmed besvimer, mens du skriver.","død"]},
+ fb:"Workarounds koster to gange: først sparer de tid, så skaber de ekstraarbejde i systemet. Det er et designproblem, ikke et dovenskabsproblem."},
+"R3-BA":{f:"BJ",alarm:1,title:"Datteren og alarmen",sit:"Systemet viste, at Fru Hansen fik medicin kl. 6, så du er på sporet. Nu kommer Birthes datter Susanne stormende: \"Ingen har talt med min mor i dag!\" Samtidig alarmerer Hr. Jensens iltmåler.",
+ c:{A:["Bed Susanne vente 5 minutter og gå til alarmen."],B:["Tag Susanne med hen til Hr. Jensens stue og tal med hende, mens du arbejder."],X1:["Bed Susanne kigge til Hr. Jensen. Hun virker kompetent.","Hun er revisor.","død"],X2:["Skru Hr. Jensens ilt helt op og gå i kantinen.","KOL-patienter kan ikke tåle for meget ilt.","død"]},
+ fb:"Alarmer konkurrerer med mennesker. Intet system prioriterer en bekymret pårørende, men hun er en del af arbejdet."},
+"R3-BB":{f:"HA",alarm:1,title:"\"Jeg tror, det blev givet\"",sit:"Mette sagde i telefonen: \"Jeg tror, det blev givet.\" Så du ventede. Nu er Fru Hansen urolig og har ondt, hendes sengealarm går, og Ahmed trykker på klokken.",
+ c:{A:["Ring til Dr. Holm og få en ny smerteordination lagt ind i systemet."],B:["Sæt dig 2 minutter hos Fru Hansen og berolig hende. Ahmed må vente lidt."],X1:["Bind Fru Hansen fast i sengen med et lagen.","Det er tvang uden lovhjemmel.","fyret"],X2:["Giv Fru Hansen en af Ahmeds sovepiller.","Forkert patient, forkert medicin.","død"]},
+ fb:"Usikker information om morgenen forplanter sig gennem hele dagen. Et \"jeg tror\" kl. 8 bliver til en urolig patient kl. 10."},
+"R4-AAA":{f:"BJ",title:"20 minutter ved skærmen",sit:"Hr. Jensen er stabil. Du er nu 25 minutter bagud med dokumentationen. Susanne står i døren og vil tale om sin mor.",
+ c:{A:["Dokumentér først (20 minutter), tal med Susanne bagefter."],B:["Tal med Susanne nu. Dokumentér i din frokostpause."],X1:["Lad Susanne skrive i journalen selv. Hun kender sin mor bedst.","Brud på journalpligten.","fyret"],X2:["Kopiér gårsdagens notater ind for alle patienter og tryk gem.","Aftenvagten handler på forkerte oplysninger.","død"]},
+ fb:"Sygeplejersker bruger en stor del af vagten ved skærmen. Hver time ved computeren er en time væk fra patienterne."},
+"R4-AAB":{f:"J",title:"Hvem gjorde hvad?",sit:"Jonas tog to af alarmerne. Nu skal begge dele dokumenteres, men ingen af jer ved helt, hvem der gjorde hvad hvornår. Susanne venter på gangen.",
+ c:{A:["Sæt dig med Jonas i 10 minutter og dokumentér det præcist sammen."],B:["Skriv selv et kort samlet notat og sig til Susanne, at du kommer om lidt."],X1:["Skriv, at Jonas gjorde det hele. Så er det hans problem.","Jonas læser det.","fyret"],X2:["Gå til frokost med Jonas. Nattevagten kan dokumentere.","Ingen ved, hvad Hr. Jensen fik.","død"]},
+ fb:"Samarbejde redder travle situationer, men systemerne er bygget til én bruger ad gangen. Teamwork bliver usynligt i journalen."},
+"R4-ABA":{f:"AB",title:"IT-køen",sit:"Ahmed er stabil efter instruksen. Men den røde advarsel fra i morges står der stadig, og du skal dokumentere både den og det lave blodsukker. Susanne kommer med en klage.",
+ c:{A:["Ring til IT-support, så advarslen bliver rettet korrekt. 15 minutter i telefonkø."],B:["Skriv et fritekst-notat, der forklarer det hele, og gå til Susanne."],X1:["Slet Fru Hansens medicinordination. Så forsvinder advarslen.","Hun får ingen medicin resten af ugen.","død"],X2:["Fortæl Susanne, at hendes mor er død, så du får fred.","Det er hun ikke.","fyret"]},
+ fb:"Når hverdagsfejl kræver IT-support, stjæler systemet tid fra plejen. Fritekst er sygeplejerskens nødudgang."},
+"R4-ABB":{f:"AB",title:"Stikord på hånden",sit:"Ahmed fik juice og har det fint. Men nu mangler tre ting at blive dokumenteret. Ahmeds kone spørger, hvornår han kommer hjem, og Susanne venter.",
+ c:{A:["Dokumentér de tre ting nu, mens du kan huske dem."],B:["Tal med de pårørende først. Skriv stikord på hånden."],X1:["Lov Ahmeds kone, at han kommer hjem i dag, selvom lægen ikke har set ham.","Lægen siger nej. Konen klager.","fyret"],X2:["Skriv det hele i en privat Messenger-gruppe med kollegerne i stedet for i journalen.","Datalæk.","fyret"]},
+ fb:"Sedler, stikord på hånden og private apps opstår, når de officielle systemer er for langsomme. Det hedder skygge-IT, og det er et sikkerhedsproblem."},
+"R4-BAA":{f:"B",title:"Klagen",sit:"Susanne har klaget til afdelingssygeplejersken over ventetiden. Du skal nu både tale med hende og dokumentere samtalen og Birthes tilstand.",
+ c:{A:["Skriv et formelt notat om sagen i systemet, før du taler med hende igen."],B:["Gå direkte ind til Birthe og Susanne og tag samtalen ordentligt nu."],X1:["Gem dig i linnedrummet, til Susanne er gået.","Afdelingssygeplejersken finder dig.","fyret"],X2:["Giv Susanne dit login, så hun selv kan følge med i journalen.","Brud på tavshedspligten.","fyret"]},
+ fb:"Pårørende er ofte dem, der opdager forværring først. Når de må vente, bliver de til et problem i stedet for en ressource."},
+"R4-BAB":{f:"B",title:"\"Hun er mere forvirret end i går\"",sit:"Du talte med Susanne, mens du arbejdede. Hun siger, at Birthe er mere forvirret end i går. Det er vigtig information, men den står ingen steder.",
+ c:{A:["Mål Birthes værdier og registrér en tidlig opsporings-score i systemet."],B:["Sig det mundtligt til Dr. Holm, når du møder ham på gangen."],X1:["Sig til Susanne, at hun forestiller sig ting.","Birthe har blodforgiftning.","død"],X2:["Giv Birthe en kop stærk kaffe. Det hjælper altid på forvirring.","Det gør det ikke.","død"]},
+ fb:"Pårørendes observationer har ingen fast plads i systemet. Den vigtigste information kommer ofte fra en datter på gangen."},
+"R4-BBA":{f:"H",title:"Sønnen ringer",sit:"Dr. Holm har lagt en ny ordination ind, og Fru Hansen har det bedre. Nu ringer hendes søn og vil have status. Du har ikke dokumenteret noget siden kl. 8.",
+ c:{A:["Bed sønnen ringe igen om en time, og dokumentér formiddagen først."],B:["Tag samtalen nu. Han kender sin mors vaner og kan hjælpe."],X1:["Fortæl sønnen, at hun er udskrevet, så han kommer og henter hende.","Han kommer. Hun er ikke udskrevet.","fyret"],X2:["Giv ham Dr. Holms private mobilnummer.","Dr. Holm er ikke begejstret.","fyret"]},
+ fb:"Telefonsamtaler med pårørende er en stor og usynlig del af arbejdet. De bliver sjældent registreret, men de tager tid."},
+"R4-BBB":{f:"A",title:"Ingenting er skrevet ned",sit:"Du sad hos Fru Hansen, og Ahmed ventede. Han er sur og har skrevet en klage. Du har ikke dokumenteret noget siden kl. 7.",
+ c:{A:["Sæt 30 minutter af og indhent al dokumentationen."],B:["Gå til Ahmed og undskyld. Dokumentér i små bidder resten af dagen."],X1:["Skriv \"alt normalt\" ved alle patienter.","Birthe var ikke normal.","død"],X2:["Sig op på stedet og gå hjem.","Du er (selv)fyret.","fyret"]},
+ fb:"Omsorg tager tid, som intet system måler. Det, der ikke står i journalen, er officielt ikke sket."},
+"R5-AAAA":{f:"J",title:"Rapporten kom aldrig frem",sit:"Alt er dokumenteret. Hr. Jensen skal hjem kl. 15, men kommunen har ikke modtaget udskrivningsrapporten. Integrationen mellem systemerne har fejlet.",
+ c:{A:["Send rapporten igen gennem systemet og vent på kvittering."],B:["Ring direkte til hjemmeplejen og forklar det mundtligt."],X1:["Send ham hjem i taxa med iltflasken på skødet og en post-it.","Iltflasken løber tør i nat.","død"],X2:["Kør ham selv hjem i din egen bil.","Afdelingen er ubemandet i en time.","fyret"]},
+ fb:"Overgangen mellem hospital og kommune er et af de største huller i sundhedsvæsenet. Systemerne taler ikke altid sammen."},
+"R5-AAAB":{f:"J",title:"Ingen frokost",sit:"Du sprang frokosten over. Du er træt og sulten, og Hr. Jensens medicinliste skal afstemmes mellem to systemer før udskrivelsen.",
+ c:{A:["Afstem medicinlisten linje for linje."],B:["Bed Jonas dobbelttjekke, mens du spiser en bolle."],X1:["Spis Hr. Jensens frokost og gå videre.","Han klager. Med rette.","fyret"],X2:["Brug medicinlisten fra hans sidste indlæggelse.","Den er fra 2019.","død"]},
+ fb:"Pauser er en sikkerhedsfaktor. Træthed og sult øger fejl, men ingen systemer planlægger pausen ind."},
+"R5-AABA":{f:"J",title:"Ingen ilt-aftale",sit:"Hr. Jensen er klar til udskrivelse. Kommunen ringer: \"Vi har ingen aftale om ilt i hjemmet.\"",
+ c:{A:["Udfyld kommunens hjælpemiddelblanket i systemet. Den har 3 skærmbilleder."],B:["Udsæt udskrivelsen til i morgen og giv Dr. Holm besked."],X1:["Lov at sende en iltflaske med posten.","PostNord leverer om 3-5 hverdage.","død"],X2:["Sig, at det er kommunens problem, og læg på.","Hr. Jensen kommer hjem uden ilt.","død"]},
+ fb:"Udskrivelser fejler oftest på overgangen mellem sektorer. Hver part har sit eget system og sin egen blanket."},
+"R5-AABB":{f:"J",title:"Det korte notat",sit:"Kommunen har læst dit korte notat og forstår ikke, hvad Jonas gjorde. De ringer midt i vagtskiftet.",
+ c:{A:["Ret notatet i systemet, så det er komplet."],B:["Forklar det i telefonen og bed dem skrive det ned."],X1:["Ræk telefonen til Fru Hansen.","Hun bestiller en pizza.","fyret"],X2:["Sig, at Hr. Jensen sagtens klarer sig uden hjemmepleje.","Det gør han ikke.","død"]},
+ fb:"Korte notater sparer tid nu og koster tid senere, for en anden."},
+"R5-ABAA":{f:"J",title:"Overlevering til Peter",sit:"IT fik rettet advarslen, men det kostede 15 minutter. Kl. 15 kommer aftenvagten Peter, og Hr. Jensen skal udskrives.",
+ c:{A:["Lav en struktureret overlevering til Peter i systemet."],B:["Giv Peter en hurtig mundtlig overlevering og en seddel."],X1:["Sig \"det står i systemet\" og gå.","Det gjorde det ikke.","død"],X2:["Tag Peters vagt også. Du har jo styr på det.","Kl. 22 forveksler du to patienter.","død"]},
+ fb:"Dagen slutter, som den startede: med en overlevering. Uden et bedre design gentager problemet sig hver 8. time."},
+"R5-ABAB":{f:"J",title:"Kommunen kan ikke læse fritekst",sit:"Dit fritekst-notat blev sendt med udskrivelsen. Kommunens system kan kun læse de strukturerede felter, så de ringer og spørger.",
+ c:{A:["Udfyld de strukturerede felter i systemet."],B:["Send notatet som PDF med sikker mail."],X1:["Send det fra din private Gmail.","Datatilsynet ringer.","fyret"],X2:["Fax det til det første nummer, du finder.","Det var en pizzeria.","fyret"]},
+ fb:"Fritekst kan læses af mennesker, men ikke af systemer. Data skal være struktureret, hvis den skal kunne flyde mellem organisationer."},
+"R5-ABBA":{f:"A",title:"Insulinplanen",sit:"Ahmed skal hjem, og hans nye insulinplan skal sendes til hans egen læge. Hans kone er stadig utilfreds.",
+ c:{A:["Send planen elektronisk til egen læge og vent på kvittering."],B:["Print planen og giv den til Ahmed i hånden."],X1:["Sig til Ahmed, at han bare kan gætte doserne.","Han gætter forkert.","død"],X2:["Skriv planen på en serviet.","Den bliver vasket med bukserne.","død"]},
+ fb:"Patienten ender ofte som budbringer mellem systemer, der ikke taler sammen."},
+"R5-ABBB":{f:"A",title:"Stikordene er væk",sit:"Du vaskede hænder, som du skal. Stikordene på hånden er væk, og Ahmed skal udskrives.",
+ c:{A:["Genskab forløbet ud fra systemets data: målinger og medicinlog."],B:["Spørg Jonas og Ahmed, hvad der skete."],X1:["Find på noget, der lyder rigtigt.","Det lød rigtigt. Det var det ikke.","fyret"],X2:["Lad være med at vaske hænder resten af dagen.","Infektion.","død"]},
+ fb:"Håndhygiejne og noter på hånden er i direkte konflikt. Når det rigtige og det praktiske strækker i hver sin retning, er det designet, der fejler."},
+"R5-BAAA":{f:"B",alarm:1,title:"Birthe bliver dårligere",sit:"Notatet om Susannes klage er skrevet. Kl. 14.30 bliver Birthe pludselig dårligere. Dr. Holm er til møde.",
+ c:{A:["Tilkald akutteamet via systemets procedure."],B:["Løb op og hent Dr. Holm fra mødet."],X1:["Google Birthes symptomer.","Google siger forkølelse.","død"],X2:["Vent til aftenvagten kommer.","Den når hun ikke.","død"]},
+ fb:"Faste procedurer for akut forværring redder liv, fordi de virker, også når man er træt og presset."},
+"R5-BAAB":{f:"B",title:"Plejehjemmet ved ingenting",sit:"Susanne fortæller, at Birthe skal på plejehjem i morgen. Plejehjemmet har intet hørt.",
+ c:{A:["Send en plejeforløbsplan elektronisk til plejehjemmet."],B:["Ring til plejehjemmet og aftal det direkte."],X1:["Bed Susanne køre sin mor derhen i dag.","Ingen tager imod dem.","død"],X2:["Lov at Birthe kan blive på hospitalet resten af livet.","Det kan hun ikke.","fyret"]},
+ fb:"Pårørende ved ofte mere om planen end systemet gør. De er limen mellem sektorerne."},
+"R5-BABA":{f:"B",alarm:1,title:"Scoren slog alarm",sit:"Den score, du registrerede, var høj. Systemet har advaret Dr. Holm. Birthe skal have antibiotika nu, men Holm er på en anden afdeling.",
+ c:{A:["Bed Holm logge på eksternt og ordinere i systemet."],B:["Tag en telefonordination, skriv den ned og få den bekræftet bagefter."],X1:["Tag antibiotika fra Ahmeds skuffe.","Hun er allergisk.","død"],X2:["Vent til i morgen.","Blodforgiftning venter ikke.","død"]},
+ fb:"Her virkede teknologien: systemet fangede faren tidligt. Digitalisering er stærkest, når den understøtter et klinisk skøn."},
+"R5-BABB":{f:"B",alarm:1,title:"Beskeden på gangen",sit:"Du sagde det til Dr. Holm på gangen, men han har glemt det. Kl. 14.30 er Birthe tydeligt dårligere.",
+ c:{A:["Registrér scoren nu og eskalér via systemet."],B:["Find Dr. Holm igen og insistér."],X1:["Skriv en post-it til Holm og sæt den på kaffemaskinen.","Han drikker te.","død"],X2:["Giv Birthe ilt fra Hr. Jensens flaske og håb det bedste.","Håb er ikke en behandling.","død"]},
+ fb:"Mundtlige beskeder på gangen forsvinder. Det, der ikke er registreret, kan ikke følges op."},
+"R5-BBAA":{f:"H",title:"Sønnen vil være med",sit:"Formiddagen er dokumenteret. Sønnen ringer igen, irriteret. Fru Hansen skal hjem i morgen med hjemmepleje, og han vil være med i planlægningen.",
+ c:{A:["Inviter ham til et videomøde i morgen via regionens app."],B:["Lav aftalen med ham i telefonen nu og skriv den ind."],X1:["Giv ham dit private nummer og sig \"bare skriv\".","Han skriver. Kl. 2 om natten.","fyret"],X2:["Send Fru Hansen hjem i taxa i aften i stedet.","Ingen er hjemme.","død"]},
+ fb:"Digitale møder kan inddrage pårørende, men kun hvis de kan finde ud af appen. Digital inklusion er også design."},
+"R5-BBAB":{f:"H",title:"Pillerne under tungen",sit:"Sønnen fortæller, at hans mor gemmer piller under tungen og spytter dem ud. Det er vigtigt. Men hvor skal det stå?",
+ c:{A:["Skriv det i et fast felt i journalen, så alle kan se det."],B:["Fortæl det til Peter ved overleveringen."],X1:["Ignorer det. Pårørende overdriver altid.","Hun har ikke fået medicin i en uge.","død"],X2:["Knus alle hendes piller i kaffen uden at spørge lægen.","Skjult medicinering kræver lægeordination.","fyret"]},
+ fb:"Pårørendes viden har sjældent en fast plads i systemet. Så lever den kun, så længe nogen husker den."},
+"R5-BBBA":{f:"A",title:"Klagen og udskrivelsen",sit:"Du har indhentet dokumentationen. Ahmed skal udskrives, og hans klage ligger stadig ubesvaret.",
+ c:{A:["Besvar klagen i systemets klagemodul og udskriv Ahmed korrekt."],B:["Tal med Ahmed ansigt til ansigt, før han går."],X1:["Slet klagen.","Den var allerede journaliseret.","fyret"],X2:["Udskriv Ahmed uden insulin, så du bliver færdig.","Han er tilbage i nat. I ambulance.","død"]},
+ fb:"Et klagemodul registrerer utilfredshed, men det er samtalen, der genopbygger tilliden."},
+"R5-BBBB":{f:"JHAB",title:"Vagtskiftet med huller",sit:"Klokken er 14.55. Du har dokumenteret i bidder, men meget mangler. Peter står klar.",
+ c:{A:["Bliv 30 minutter over og skriv det hele færdigt. Ubetalt."],B:["Giv Peter en grundig mundtlig overlevering og gå til tiden."],X1:["Gå hjem uden at sige noget.","Peter ved intet.","død"],X2:["Sig til Peter, at han kan gætte sig frem.","Han gætter forkert.","død"]},
+ fb:"Mange sygeplejersker bliver ubetalt over for at nå dokumentationen. Det er usynligt arbejde, som systemet forudsætter."}
+};
+
+/* [K3] SLUTPROFILER (efter antal A-valg) og de 32 SLUTNINGER (nøgle = hele vejen, fx AABBA). */
+const PROFILES = {5:"Systemets mester",4:"Regelrytteren",3:"Balancegangeren",2:"Praktikeren",1:"Genvejsmesteren",0:"Hjertet før skærmen"};
+const ENDINGS = {
+AAAAA:"Kvitteringen kom kl. 15.40. Hr. Jensen kom sikkert hjem, og du gik 40 minutter over tid.",
+AAAAB:"Hjemmeplejen fik besked i telefonen. Journalen er perfekt, bortset fra den sidste samtale.",
+AAABA:"Medicinlisten er afstemt. Du var tæt på at besvime i omklædningsrummet.",
+AAABB:"Jonas fangede en fejl i medicinlisten, mens du spiste. Teamwork virker.",
+AABAA:"Iltaftalen kom på plads kl. 16.10. Hr. Jensen ventede 70 minutter i jakke.",
+AABAB:"Hr. Jensen blev en nat mere. Sikkert, men akutmodtagelsen mangler en seng.",
+AABBA:"Notatet er nu komplet, og kommunen er glad. Du gik 20 minutter for sent.",
+AABBB:"Kommunen skrev det ned på en blok. Ingen ved, om det når frem til hjemmehjælperen.",
+ABAAA:"Peter fik en perfekt overlevering i systemet. Han havde bare ikke tid til at læse den.",
+ABAAB:"Peter fik det vigtigste mundtligt. Sedlen fandt han i lommen næste morgen.",
+ABABA:"De strukturerede felter er udfyldt. Nu kan kommunen læse det, du skrev i morges.",
+ABABB:"PDF'en kom frem. Kommunen tastede det hele ind igen i hånden.",
+ABBAA:"Egen læge fik insulinplanen. Ahmed fik den aldrig forklaret.",
+ABBAB:"Ahmed gik hjem med planen i hånden. Egen læge har intet set.",
+ABBBA:"Systemets data reddede dig. Det, du huskede, passede ikke helt.",
+ABBBB:"Jonas og Ahmed huskede hver sin version. Journalen fik en tredje.",
+BAAAA:"Akutteamet kom på 3 minutter. Birthe overlevede, fordi proceduren virkede.",
+BAAAB:"Dr. Holm kom løbende fra mødet. Birthe blev stabiliseret.",
+BAABA:"Plejeforløbsplanen er sendt. Plejehjemmet åbner den i morgen kl. 9.",
+BAABB:"Plejehjemmet er klar. Ingen i systemet ved, at aftalen er lavet.",
+BABAA:"Antibiotika givet kl. 14.52. Systemet fangede det, Susanne så.",
+BABAB:"Antibiotika givet på telefonordination. Dr. Holm glemte at bekræfte den.",
+BABBA:"Scoren eskalerede sagen. Birthe fik hjælp 2 timer senere, end hun kunne have fået.",
+BABBB:"Dr. Holm kom. Næste gang er det måske ikke dig, der finder ham.",
+BBAAA:"Videomødet er booket. Sønnen har bare aldrig brugt appen.",
+BBAAB:"Aftalen er på plads, og sønnen føler sig hørt.",
+BBABA:"Advarslen om pillerne står nu i journalen. Aftenvagten så den.",
+BBABB:"Peter fik beskeden om pillerne. Nattevagten fik den ikke.",
+BBBAA:"Klagen er besvaret i modulet. Ahmed kommer ikke tilbage, hvis han kan undgå det.",
+BBBAB:"Ahmed trak klagen tilbage efter jeres samtale.",
+BBBBA:"Du gik hjem kl. 15.30, ubetalt. Men alt står i journalen.",
+BBBBB:"Peter ved alt. Journalen ved næsten intet. Går noget galt i nat, står du alene."
+};
+
+/* [K4] TEGNESERIE-MANUSKRIPT. Tre paneler pr. node: [venstre figur, højre figur,
+   hvem taler ("l"/"r"), taleboble]. Koderne er personer (N = dig, M = Mette,
+   D = lægen ...), patienter (J/H/A/B) eller ting (pc, note, bell ...).
+   Tegningerne laves af panel() [K12]. */
+const COMICS = {
+"START":[["N","clock","l","Kl. 06.50. Tid til vagt"],["M","note","l","God vagt! Jeg skal gå"],["N","bell","l","Klar til 4 patienter?"]],
+"R1":[["M","N","l","Jeg har kun 4 minutter!"],["note","N","r","En krøllet seddel?"],["N","pc","r","Systemet loader stadig..."]],
+"R2-A":[["scan","N","l","BIP! Fejl"],["H","N","l","Hvor er min pille?"],["N","clock","l","10 min bagud"]],
+"R2-B":[["note","N","r","Kl. 6... givet?"],["H","N","l","Det kan jeg ikke huske"],["N","pc","l","Login tager 4 min"]],
+"R3-AA":[["J","bell","r","BIIIP! Ilt"],["A","bell","r","Ring! Ring!"],["H","bell","r","Sengealarm!"]],
+"R3-AB":[["pc","N","l","Ikke scannet!"],["A","N","l","Jeg sveder..."],["N","juice","l","Blodsukker 3,1!"]],
+"R3-BA":[["S","N","l","Ingen taler med mor!"],["J","bell","r","BIIIP! Ilt"],["N","S","l","Et øjeblik..."]],
+"R3-BB":[["M","phone","l","Jeg tror, det blev givet"],["H","N","l","Det gør ondt!"],["A","bell","r","Ring! Ring!"]],
+"R4-AAA":[["N","pc","l","20 min ved skærmen"],["S","N","l","Hvornår har du tid?"],["J","N","l","Jeg har det fint"]],
+"R4-AAB":[["C","N","l","Hvem tog hvilken alarm?"],["N","pc","l","Hvad skriver vi?"],["S","clock","l","Jeg venter stadig"]],
+"R4-ABA":[["pc","N","l","Advarsel!"],["N","phone","l","IT-kø: nr. 12"],["S","N","l","Jeg vil klage!"]],
+"R4-ABB":[["A","juice","l","Bedre nu, tak"],["K","N","l","Hvornår kommer han hjem?"],["N","note","l","3 ting mangler"]],
+"R4-BAA":[["S","D","l","Jeg har klaget!"],["N","pc","l","Notat eller samtale?"],["B","S","l","Susanne?"]],
+"R4-BAB":[["S","N","l","Mor er mere forvirret"],["B","N","l","Hvor er jeg?"],["N","pc","l","Hvor skriver jeg det?"]],
+"R4-BBA":[["D","pc","l","Ny ordination lagt ind"],["O","phone","l","Hvordan går det med mor?"],["N","note","l","Intet skrevet siden kl. 8"]],
+"R4-BBB":[["A","N","l","Jeg ventede og ventede!"],["A","letter","l","Klage"],["N","pc","l","Intet dokumenteret"]],
+"R5-AAAA":[["J","N","l","Skal jeg hjem nu?"],["pc","letter","l","Ikke modtaget"],["N","phone","l","Kommunen ved intet"]],
+"R5-AAAB":[["N","clock","l","Ingen frokost i dag"],["pc","pills","l","Liste A ≠ liste B"],["C","N","l","Skal jeg tjekke?"]],
+"R5-AABA":[["phone","N","l","Ingen ilt-aftale!"],["J","N","l","Hvad med min ilt?"],["N","pc","l","Blanket: 3 sider"]],
+"R5-AABB":[["phone","N","l","Hvad gjorde Jonas?"],["N","note","l","Mit korte notat..."],["P","N","l","Vagtskifte nu!"]],
+"R5-ABAA":[["pc","N","l","Rettet. Tog 15 min"],["P","N","l","Overlevering?"],["J","house","l","Hjem kl. 15"]],
+"R5-ABAB":[["phone","N","l","Kan ikke læse fritekst"],["N","pc","l","Strukturerede felter?"],["letter","N","r","PDF eller felter?"]],
+"R5-ABBA":[["A","K","r","Endelig hjem"],["N","pills","l","Ny insulinplan"],["D","letter","l","Til egen læge"]],
+"R5-ABBB":[["N","sink","l","Vask hænder!"],["N","note","l","Stikordene er væk!"],["A","N","l","Må jeg gå hjem?"]],
+"R5-BAAA":[["B","N","l","Jeg har det skidt..."],["D","clock","l","Jeg er til møde"],["N","phone","l","Akutteam?"]],
+"R5-BAAB":[["S","N","l","Plejehjem i morgen"],["phone","N","l","Vi har intet hørt"],["N","pc","l","Planen mangler"]],
+"R5-BABA":[["pc","D","l","Høj score!"],["B","N","l","Jeg fryser"],["D","phone","l","Er på anden afdeling"]],
+"R5-BABB":[["D","N","l","Hvad sagde du i morges?"],["B","bell","r","Hun er dårligere"],["N","pc","l","Registrér nu?"]],
+"R5-BBAA":[["O","phone","l","Jeg vil være med"],["H","N","l","Hjem i morgen?"],["N","pc","l","App eller telefon?"]],
+"R5-BBAB":[["O","N","l","Hun spytter pillerne ud"],["H","pills","l","Mmh..."],["N","pc","l","Hvor skal det stå?"]],
+"R5-BBBA":[["A","letter","l","Hvad med min klage?"],["N","pc","l","Klagemodulet"],["K","A","l","Kom nu, skat"]],
+"R5-BBBB":[["N","clock","l","Kl. 14.55"],["P","N","l","Klar til overlevering"],["N","note","l","Meget mangler..."]]
+};
+/* [K5] FARVER pr. patient, figurer i tegneserien, ur-ankre (minutter efter midnat:
+   420 = 07.00) og svarmulighederne til forskningsspørgsmålene. */
+const PCOL = {J:"#4CC3E8",H:"#E3A93A",A:"#B58CFF",B:"#FF7A9A"};
+const PEOPLE = {N:{c:"#0D6B68",cap:1},M:{c:"#6E5BC9",cap:1},C:{c:"#6E5BC9",cap:1},P:{c:"#0D6B68",cap:1},D:{c:"#F4F4F4",coat:1},S:{c:"#D8603A"},K:{c:"#3B8F4A"},O:{c:"#4A6A8F"}};
+const ANCHOR = {1:420,2:510,3:600,4:720,5:870};
+const DRIVERS = ["Patientens sikkerhed","Tiden","Reglerne","Mavefornemmelse"];
+const BLAME = ["Mig","Kollegaen","Systemet","Ledelsen"];
+
+/* [K6] TILSTAND. player = anonymt spiller-ID (gemt i browserens localStorage, så
+   samme telefon genkendes). profile = profilsvarene. S = alt om den igangværende vagt:
+   attempt (forsøg), game (ID for denne vagt), path (fx "AB"), node, phase, stress m.m. */
+/* ---------- state ---------- */
+const $ = id => document.getElementById(id);
+const newId = () => "p" + Math.random().toString(36).slice(2,9);
+let player = "", profile = null;
+try{ player = localStorage.getItem("vagt-player") || ""; profile = JSON.parse(localStorage.getItem("vagt-profile")||"null"); }catch(e){}
+if(!player){ player = newId(); try{localStorage.setItem("vagt-player",player)}catch(e){} }
+const S = {attempt:1, game:"", path:"", node:null, phase:"start", hr:72, stress:0, t0:0, raf:0, fb:{}, end:{}, pending:null, hs:null};
+
+/* [K7] DATALAGET. google.script.run er Googles bro fra browseren til serverkoden.
+   Data.save("Valg", række) kalder logRow() i Code.gs [G5], der skriver en række i
+   Sheetet. Fejl ignoreres bevidst, så spillet aldrig går i stå pga. netværket.
+   [K8] loadHS() henter top 5 fra getHighscore() [G7].
+   flushPending() gemmer et game over-valg, når spilleren går videre (så svaret på
+   "hvem havde ansvaret" kommer med i samme række). */
+/* ---------- data (Google Apps Script) ---------- */
+const gs = () => (window.google && google.script && google.script.run) ? google.script.run : null;
+const Data = {
+  save(sheet, row){ const r = gs(); if(!r) return; try{ r.withFailureHandler(()=>{}).logRow(sheet, row); }catch(e){} }
+};
+function loadHS(){
+  const r = gs(); if(!r) { S.hs = []; renderTicker(); return; }
+  try{ r.withSuccessHandler(d=>{ S.hs = d||[]; renderTicker(); }).withFailureHandler(()=>{ S.hs = []; renderTicker(); }).getHighscore(); }catch(e){}
+}
+function flushPending(){ if(S.pending){ Data.save("Valg", S.pending); S.pending = null; } }
+addEventListener("pagehide", flushPending);
+
+/* [K9] NY SPILLER (nyt anonymt ID, tom profil) og NYT SPIL (nyt vagt-ID). */
+function newPlayer(){
+  flushPending();
+  profile = null; player = newId();
+  try{ localStorage.removeItem("vagt-profile"); localStorage.setItem("vagt-player",player); }catch(e){}
+  Object.assign(S,{attempt:1,game:"",path:"",node:null,stress:0,fb:{},end:{},phase:"profile"});
+  render();
+}
+function newGame(){ S.game = "g"+Math.random().toString(36).slice(2,8); S.path=""; S.stress=0; S.fb={}; S.end={}; }
+
+/* [K10] PATIENTMONITOREN (venstre ramme).
+   renderWard() tegner de fire stuer og fremhæver dem, situationen handler om.
+   setVitals() sætter puls, stress og alarm. EKG-kurven tegnes løbende på et
+   <canvas> med requestAnimationFrame; hastigheden følger pulsen (S.hr). */
+/* ---------- monitor ---------- */
+function renderWard(focus=""){
+  $("ward").innerHTML = Object.entries(PATIENTS).map(([k,p])=>
+    `<div class="bed ${focus.includes(k)?"focus":""}" data-p="${k}" style="--pc:${PCOL[k]}"><div class="no">${p.no}</div><div class="nm"><span class="dot"></span>${p.nm}</div><div>${p.info}</div></div>`).join("");
+}
+function setVitals(hr, stress, alarm, room, note){
+  S.hr = hr; $("hr").textContent = Math.round(hr);
+  $("stressV").textContent = stress;
+  $("monitor").classList.toggle("alarm", !!alarm);
+  if(room) $("monRoom").textContent = room;
+  if(note) $("monNote").textContent = note;
+}
+const cv = $("ecg"), cx = cv.getContext("2d");
+let ecgX = 0, ecgPhase = 0, lastY = 0, lastT = 0;
+const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+function sizeCanvas(){ const r = cv.getBoundingClientRect(); cv.width = Math.max(200, r.width*devicePixelRatio); cv.height = 96*devicePixelRatio; ecgX = 0; }
+function beat(p){
+  if(p<.10) return Math.sin(p/.10*Math.PI)*.12;
+  if(p<.16) return 0;
+  if(p<.18) return -.15;
+  if(p<.21) return 1;
+  if(p<.24) return -.3;
+  if(p<.40) return 0;
+  if(p<.55) return Math.sin((p-.40)/.15*Math.PI)*.25;
+  return 0;
+}
+function ecgTick(t){
+  const dt = Math.min(50, t-(lastT||t)); lastT = t;
+  const w = cv.width, h = cv.height, step = 1.4*devicePixelRatio*dt/16;
+  ecgPhase += dt/1000 * (S.hr/60);
+  const y = h*.62 - beat(ecgPhase%1)*h*.5;
+  cx.fillStyle = "#0A1315"; cx.fillRect(ecgX, 0, 14*devicePixelRatio, h);
+  cx.strokeStyle = $("monitor").classList.contains("alarm") ? "#FF5A4E" : "#43D693";
+  cx.lineWidth = 2*devicePixelRatio; cx.beginPath(); cx.moveTo(ecgX, lastY||y); cx.lineTo(ecgX+step, y); cx.stroke();
+  lastY = y; ecgX += step; if(ecgX > w){ ecgX = 0; lastY = 0; }
+  requestAnimationFrame(ecgTick);
+}
+function staticEcg(){ const w=cv.width,h=cv.height; cx.fillStyle="#0A1315";cx.fillRect(0,0,w,h); cx.strokeStyle="#43D693";cx.lineWidth=2*devicePixelRatio;cx.beginPath(); for(let x=0;x<w;x++){const y=h*.62-beat((x/(w/4))%1)*h*.5; x?cx.lineTo(x,y):cx.moveTo(x,y);} cx.stroke(); }
+sizeCanvas(); addEventListener("resize", ()=>{sizeCanvas(); if(reduce) staticEcg();});
+reduce ? staticEcg() : requestAnimationFrame(ecgTick);
+
+/* [K11] HJÆLPEFUNKTIONER
+   esc()       beskytter mod HTML i tekst (sikkerhed).
+   hl()        finder patientnavne i teksten og laver dem til farvede "piller"
+               med stuenummer, så tekst og monitor hænger sammen.
+   clockNow()  regner klokkeslættet ud: 06.50 ved start, derefter 5 min pr. kort.
+   opts()/bindOpts()  bygger og lytter på knaprækkerne til spørgsmålene.          */
+/* ---------- helpers ---------- */
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g, c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const NAMES = {"Hr. Jensen":"J","Fru Hansen":"H","Ahmed":"A","Birthe":"B"};
+const hl = s => esc(s).replace(/(Hr\. Jensen|Fru Hansen|Ahmed|Birthe)(s?)/g, (m,n,poss)=>{ const k = NAMES[n]; return `<span class="pt" data-p="${k}" style="--pc:${PCOL[k]}">${n}${poss}<i>${PATIENTS[k].no}</i></span>`; });
+const mentioned = s => Object.keys(NAMES).filter(n=>s.includes(n)).map(n=>NAMES[n]).join("");
+const roundOf = id => +id[1];
+const fmt = m => String(Math.floor(m/60)).padStart(2,"0")+"."+String(m%60).padStart(2,"0");
+function clockNow(){
+  if(!S.node || S.phase==="start" || S.phase==="profile") return 410;
+  if(S.phase==="end") return 900;
+  const a = ANCHOR[roundOf(S.node)];
+  return S.phase==="info" ? a-5 : (S.phase==="stress"||S.phase==="over") ? a : a+5;
+}
+function chips(){
+  const r = S.node && S.phase!=="start" && S.phase!=="profile" ? roundOf(S.node) : 0;
+  $("chipRound").textContent = r ? `Runde ${r}/5` : "Runde –/5";
+  $("chipClock").textContent = "Kl. " + fmt(clockNow());
+  $("chipTry").textContent = "Forsøg " + S.attempt;
+  const c = $("chipWho"); c.hidden = !profile; if(profile) c.textContent = profile.nick;
+}
+function shuffle(a){ for(let i=a.length-1;i>0;i--){const j=Math.floor(Math.random()*(i+1));[a[i],a[j]]=[a[j],a[i]];} return a; }
+function stopTimer(){ cancelAnimationFrame(S.raf); $("timer").classList.remove("on","low"); }
+function opts(name, list, sel, labels){
+  return `<div class="opts" data-q="${name}">${list.map((v,i)=>`<button type="button" class="opt ${sel==v?"sel":""}" data-v="${esc(v)}">${esc(labels?labels[i]:v)}</button>`).join("")}</div>`;
+}
+function bindOpts(store, onChange){
+  document.querySelectorAll("#card .opts").forEach(g=>{
+    g.querySelectorAll(".opt").forEach(b=> b.onclick = ()=>{
+      store[g.dataset.q] = b.dataset.v;
+      g.querySelectorAll(".opt").forEach(x=>x.classList.toggle("sel", x===b));
+      const e = $("qerr"); if(e) e.textContent = "";
+      onChange && onChange();
+    });
+  });
+}
+
+/* [K12] TEGNESERIEN tegnes som SVG direkte i koden (ingen billedfiler):
+   person(), patientBed() og prop() tegner figurer og ting, panel() samler et panel
+   med taleboble, der selv ombrydes til max 3 linjer. */
+/* ---------- comic + top 5 ---------- */
+function wrap(t, n){ const w = t.split(" "), out=[""]; w.forEach(x=>{ if((out[out.length-1]+" "+x).trim().length>n && out[out.length-1]) out.push(x); else out[out.length-1]=(out[out.length-1]+" "+x).trim(); }); return out.slice(0,3); }
+function person(code, x){
+  const p = PEOPLE[code]; const skin="#F2C9A5", hair = code==="C"||code==="O"||code==="D" ? "#3A2A20" : "#6B4A2E";
+  let s = `<g transform="translate(${x},0)">`;
+  s += `<rect x="-17" y="92" width="34" height="40" rx="11" fill="${p.c}" stroke="#14232A" stroke-width="2"/>`;
+  if(p.coat) s += `<rect x="-3" y="94" width="6" height="34" fill="#4CC3E8"/>`;
+  s += `<circle cx="0" cy="76" r="15" fill="${skin}" stroke="#14232A" stroke-width="2"/>`;
+  s += `<path d="M-15 72 Q0 54 15 72 Q8 64 0 64 Q-8 64 -15 72Z" fill="${hair}"/>`;
+  if(p.cap) s += `<rect x="-11" y="57" width="22" height="7" rx="2" fill="#FFFFFF" stroke="#14232A" stroke-width="1.5"/><path d="M-2 60h4M0 58v4" stroke="#C2302A" stroke-width="1.5"/>`;
+  s += `<circle cx="-5" cy="77" r="1.8" fill="#14232A"/><circle cx="5" cy="77" r="1.8" fill="#14232A"/><path d="M-5 84 Q0 87 5 84" fill="none" stroke="#14232A" stroke-width="1.5"/>`;
+  return s + `</g>`;
+}
+function patientBed(code, x){
+  const c = PCOL[code];
+  return `<g transform="translate(${x},0)"><rect x="-40" y="104" width="80" height="18" rx="4" fill="#DDE6E8" stroke="#14232A" stroke-width="2"/><rect x="-40" y="122" width="6" height="12" fill="#14232A"/><rect x="34" y="122" width="6" height="12" fill="#14232A"/>
+  <rect x="-36" y="94" width="22" height="12" rx="5" fill="#FFFFFF" stroke="#14232A" stroke-width="1.5"/><circle cx="-24" cy="88" r="12" fill="#F2C9A5" stroke="#14232A" stroke-width="2"/>
+  <path d="M-29 88 h3 M-22 88 h3" stroke="#14232A" stroke-width="1.5"/><rect x="-12" y="92" width="50" height="16" rx="6" fill="${c}" stroke="#14232A" stroke-width="2"/>
+  <text x="18" y="104" text-anchor="middle" font-size="10" font-family="JetBrains Mono,monospace" fill="#14232A">${PATIENTS[code].no.replace("Stue ","")}</text></g>`;
+}
+function prop(code, x){
+  const g = (inner)=>`<g transform="translate(${x},0)" stroke="#14232A" stroke-width="2">${inner}</g>`;
+  switch(code){
+    case "note": return g(`<path d="M-18 78 L16 74 L20 118 L-14 122Z" fill="#FFF3B0"/><path d="M-10 88h20M-9 98h18M-8 108h14" stroke-width="1.5"/>`);
+    case "pc": return g(`<rect x="-28" y="66" width="56" height="40" rx="4" fill="#0A1315"/><rect x="-22" y="72" width="44" height="28" fill="#1E3034" stroke="none"/><path d="M-16 80h24M-16 88h30M-16 94h18" stroke="#43D693" stroke-width="2"/><rect x="-8" y="106" width="16" height="10" fill="#9AA9AD"/><rect x="-20" y="116" width="40" height="6" rx="2" fill="#9AA9AD"/>`);
+    case "phone": return g(`<rect x="-12" y="70" width="24" height="46" rx="5" fill="#2A3B41"/><rect x="-8" y="76" width="16" height="30" fill="#4CC3E8" stroke="none"/><circle cx="0" cy="111" r="2" fill="#FFFFFF" stroke="none"/>`);
+    case "scan": return g(`<path d="M-14 74 h28 l-4 22 h-20Z" fill="#FFB020"/><rect x="-6" y="96" width="12" height="26" rx="3" fill="#2A3B41"/><path d="M-20 70 l-8 -8 M0 66 v-10 M20 70 l8 -8" stroke="#C2302A" stroke-width="3"/>`);
+    case "pills": return g(`<rect x="-14" y="80" width="28" height="40" rx="5" fill="#FFFFFF"/><rect x="-16" y="72" width="32" height="10" rx="3" fill="#C2302A"/><ellipse cx="-24" cy="118" rx="6" ry="3.5" fill="#E3A93A"/><ellipse cx="24" cy="116" rx="6" ry="3.5" fill="#4CC3E8"/>`);
+    case "bell": return g(`<path d="M-16 106 Q-16 76 0 74 Q16 76 16 106Z" fill="#FFB020"/><rect x="-20" y="106" width="40" height="6" rx="3" fill="#FFB020"/><circle cx="0" cy="117" r="4" fill="#FFB020"/><path d="M-28 82 l-8 -4 M28 82 l8 -4 M-30 96 h-9 M30 96 h9" stroke="#C2302A" stroke-width="3"/>`);
+    case "clock": return g(`<circle cx="0" cy="96" r="26" fill="#FFFFFF"/><path d="M0 96 V78 M0 96 L12 102" stroke-width="3"/><circle cx="0" cy="96" r="3" fill="#14232A"/>`);
+    case "juice": return g(`<path d="M-14 76 h28 l-4 46 h-20Z" fill="#FFB020"/><path d="M4 76 l8 -18" stroke-width="3"/><text x="0" y="104" text-anchor="middle" font-size="11" font-family="Barlow Condensed,sans-serif" font-weight="700" fill="#14232A" stroke="none">SAFT</text>`);
+    case "letter": return g(`<rect x="-24" y="78" width="48" height="34" rx="3" fill="#FFFFFF"/><path d="M-24 80 L0 98 L24 80" fill="none"/><circle cx="18" cy="106" r="6" fill="#C2302A"/>`);
+    case "house": return g(`<path d="M-26 92 L0 68 L26 92" fill="#D8603A"/><rect x="-20" y="92" width="40" height="32" fill="#FFF3E0"/><rect x="-6" y="104" width="12" height="20" fill="#6B4A2E"/>`);
+    case "sink": return g(`<rect x="-26" y="96" width="52" height="16" rx="6" fill="#DDE6E8"/><path d="M8 96 V78 h-12" fill="none" stroke-width="3"/><path d="M-4 84 v10 M0 86 v8" stroke="#4CC3E8" stroke-width="2"/>`);
+  }
+  return "";
+}
+function actor(code, x){ if(PCOL[code]) return patientBed(code, x); if(PEOPLE[code]) return person(code, x); return prop(code, x); }
+function panel(spec, i){
+  const [l, r, who, txt] = spec, bgs = ["#EAF4F2","#FFF6E5","#EEF0FB"];
+  const lines = wrap(txt, 18), bw = Math.max(...lines.map(s=>s.length))*7.7+20, bh = lines.length*15+12;
+  const sx = who==="r" ? 186 : 66, bx = Math.min(Math.max(sx - bw/2, 6), 254-bw);
+  const tail = `<path d="M${sx-6} ${8+bh-1} L${sx} ${8+bh+10} L${sx+6} ${8+bh-1}" fill="#FFFFFF" stroke="#14232A" stroke-width="2"/>`;
+  const bubble = txt ? `<rect x="${bx}" y="8" width="${bw}" height="${bh}" rx="10" fill="#FFFFFF" stroke="#14232A" stroke-width="2"/>${tail}<rect x="${sx-5}" y="${8+bh-3}" width="10" height="4" fill="#FFFFFF"/>`+
+    lines.map((s,k)=>`<text x="${bx+bw/2}" y="${8+18+k*15}" text-anchor="middle" font-size="14" font-family="Barlow Condensed,Arial Narrow,sans-serif" font-weight="600" fill="#14232A">${esc(s)}</text>`).join("") : "";
+  return `<svg viewBox="0 0 260 140" role="img" aria-label="${esc(txt)}"><rect x="1" y="1" width="258" height="138" rx="6" fill="${bgs[i%3]}" stroke="#14232A" stroke-width="2"/><path d="M2 132 H258" stroke="#C9D6D8" stroke-width="2"/>${actor(l,66)}${actor(r,190)}${bubble}</svg>`;
+}
+/* [K13] renderSide() viser tegneserien for den aktuelle node.
+   renderTicker() bygger top 5-tickeren og sætter hastigheden efter antal navne. */
+function renderSide(){
+  const side = $("side"); if(!side) return;
+  const key = (S.phase==="start"||S.phase==="profile"||!S.node) ? "START" : S.node;
+  side.innerHTML = `<div class="strip">${(COMICS[key]||COMICS.START).map(panel).join("")}</div>`;
+}
+function renderTicker(){
+  const t = $("tkTrack"); if(!t) return;
+  const rows = S.hs || [];
+  const one = rows.length ? rows.map((r,i)=>`<span class="tk-item ${profile&&r.nick===profile.nick?"me":""}"><span class="rk">#${i+1}</span><b>${esc(r.nick)}</b><span>${r.korrekte} korrekte svar</span><span class="sep">·</span><span>${r.spil} spil</span>${r.gennemfoert?`<span class="sep">·</span><span>${r.gennemfoert} hele vagter</span>`:""}</span>`).join("")
+    : `<span class="tk-item">Ingen på listen endnu. Spil en vagt og bliv den første.</span>`;
+  t.innerHTML = one + one;
+  t.style.setProperty("--tk-dur", Math.max(20, rows.length*8) + "s");
+}
+
+/* [K14] render() – HJERTET I SPILLET. Tegner skærmen ud fra S.phase:
+     profile   profilformular (kaldenavn + baggrundsspørgsmål)        → gemmes i "Spillere"
+     start     velkomst, regler, "Start vagten" / "Ny spiller"
+     info      info-kortet: situationen læses, uret står stille
+     stress    de 4 valg i tilfældig rækkefølge + 15 sek. nedtælling [K15]
+     over      game over + "hvem havde ansvaret?"                      → gemmes i "Valg"
+     feedback  forklaring + stress, sikkerhed og "hvad styrede dit valg" → gemmes i "Valg"
+     end       slutprofil + 4 afsluttende spørgsmål                    → gemmes i "Slutninger" */
+/* ---------- screens ---------- */
+function render(){
+  chips();
+  const card = $("card"), act = $("actions");
+  act.className = "actions";
+  if(S.phase==="profile" || (S.phase==="start" && (!profile || !profile.erfaring))){
+    S.phase="profile";
+    renderWard(""); setVitals(72,0,false,"Vagtstuen","Pulsen stiger, når tiden løber.");
+    const p = profile || {};
+    const sel = (id, list, v)=>`<select id="${id}">${["",...list].map(o=>`<option ${o===(v||"")?"selected":""} value="${o}">${o||"Vælg"}</option>`).join("")}</select>`;
+    card.innerHTML = `<span class="tag info">Før vagten</span>
+      <h2>Hvem tager vagten i dag?</h2>
+      <p>Du er anonym. Svarene hjælper os med at forstå, hvordan unge oplever plejepersonalets ansvar og dilemmaer.</p>
+      <form class="form" id="pform" novalidate>
+        <div class="field"><label for="nick">Kaldenavn</label><input id="nick" maxlength="24" autocomplete="off" placeholder="fx Natugle42" value="${esc(p.nick||"")}"></div>
+        <div class="row2">
+          <div class="field"><label for="age">Alder</label>${sel("age",["Under 18","18-24","25-34","35+"],p.age)}</div>
+          <div class="field"><label for="bg">Baggrund</label>${sel("bg",["Gymnasieelev","Studerende","Sundhedsfaglig","IT","Underviser","Andet"],p.bg)}</div>
+        </div>
+        <div class="row2">
+          <div class="field"><label for="erf">Erfaring fra pleje eller sundhed?</label>${sel("erf",["Ja","Nej"],p.erfaring)}</div>
+          <div class="field"><label for="int">Overvejer du et job i plejen?</label>${sel("int",["Ja","Måske","Nej"],p.interesse_foer)}</div>
+        </div>
+        <div class="field"><label for="ken">Hvor godt kender du plejepersonalets hverdag?</label>${sel("ken",["1 – slet ikke","2","3","4","5 – rigtig godt"],p.kendskab)}</div>
+        <div class="field"><label for="desc">Kort om dig <small>(frivilligt)</small></label><textarea id="desc" maxlength="200" placeholder="fx 1. semester, har arbejdet på plejehjem">${esc(p.desc||"")}</textarea></div>
+        <div class="err" id="perr"></div>
+      </form>
+      <p class="note">Ingen e-mail, intet navn. Kun det, du skriver her.</p>`;
+    act.className = "actions one";
+    act.innerHTML = `<button class="key primary" id="psave">Gem og gå til vagten</button>`;
+    const submit = ()=>{
+      const nick = $("nick").value.trim();
+      if(nick.length<2){ $("perr").textContent="Skriv et kaldenavn på mindst 2 tegn."; $("nick").focus(); return; }
+      const miss = [["age","alder"],["bg","baggrund"],["erf","erfaring"],["int","job i plejen"],["ken","kendskab"]].filter(([id])=>!$(id).value);
+      if(miss.length){ $("perr").textContent = "Udfyld også: " + miss.map(m=>m[1]).join(", ") + "."; $(miss[0][0]).focus(); return; }
+      if(!profile || profile.nick!==nick){ player = newId(); try{localStorage.setItem("vagt-player",player)}catch(e){} }
+      profile = {nick, age:$("age").value, bg:$("bg").value, erfaring:$("erf").value, interesse_foer:$("int").value, kendskab:$("ken").value.charAt(0), desc:$("desc").value.trim()};
+      try{ localStorage.setItem("vagt-profile", JSON.stringify(profile)); }catch(e){}
+      Data.save("Spillere",{player, nick:profile.nick, age:profile.age, bg:profile.bg, desc:profile.desc, erfaring:profile.erfaring, interesse_foer:profile.interesse_foer, kendskab:+profile.kendskab, ts:new Date().toISOString()});
+      S.phase="start"; render();
+    };
+    $("pform").onsubmit = e=>{ e.preventDefault(); submit(); };
+    ["nick","age","bg","erf","int","ken"].forEach(id=> $(id).addEventListener("input", ()=> $("perr").textContent=""));
+    $("psave").onclick = submit;
+    if(S.hs===null) loadHS();
+    renderSide();
+    return;
+  }
+  if(S.phase==="start"){
+    renderWard(""); setVitals(72,0,false,"Vagtstuen","Pulsen stiger, når tiden løber.");
+    card.innerHTML = `<span class="tag info">Info</span>
+      <h2>Kl. 06.50. Din vagt starter snart.</h2>
+      <p class="lead">Du er sygeplejerske på en medicinsk afdeling med 4 patienter, én kollega og ingen tid. Dagen går fra 06.50 til 15.00, og du træffer beslutninger under pres.</p>
+      <ul class="rules">
+        <li><b>15 sek.</b>til hvert valg. Når tiden løber ud, dør baby.</li>
+        <li><b>2 af 4</b>valg er katastrofer. Patient død eller du er fyret.</li>
+        <li><b>32 slutninger.</b>Dine valg former resten af vagten.</li>
+      </ul>
+      <p class="note">Du spiller som <b>${esc(profile.nick)}</b>. Ikke dig? Tryk på "Ny spiller".</p>`;
+    act.className = "actions two";
+    act.innerHTML = `<button class="key primary" id="go">Start vagten</button><button class="key ghost" id="np">Ny spiller</button>`;
+    $("go").onclick = ()=>{ newGame(); goNode("R1"); };
+    $("np").onclick = newPlayer;
+    loadHS(); renderSide();
+    return;
+  }
+  const n = N[S.node], r = roundOf(S.node), R = ROUNDS[r], focus = n.f + mentioned(n.sit);
+  if(S.phase==="info"){
+    renderWard(focus); setVitals(70+r*6, S.stress, false, R.room, `Runde ${r}: ${R.theme}`);
+    card.innerHTML = `<span class="tag info">Info · ${esc(R.theme)}</span>
+      <div class="meta">Kl. ${fmt(clockNow())} · ${S.node}</div>
+      <h2>${hl(n.title)}</h2><p class="lead">${hl(n.sit)}</p>`;
+    act.className = "actions one";
+    act.innerHTML = `<button class="key primary" id="ready">Jeg er klar. Start uret</button>`;
+    $("ready").onclick = ()=>{ S.phase="stress"; render(); };
+    $("ready").focus({preventScroll:true});
+  }
+  else if(S.phase==="stress"){
+    renderWard(focus); setVitals(95+r*6, S.stress, !!n.alarm, R.room, "Vælg nu.");
+    card.innerHTML = `<span class="tag stress">Stress · beslut nu</span>
+      <div class="meta">Kl. ${fmt(clockNow())} · ${S.node}</div>
+      <h2>${hl(n.title)}</h2><p>${hl(n.sit)}</p><p><b>Hvad gør du?</b></p>`;
+    const keys = shuffle(["A","B","X1","X2"]);
+    act.innerHTML = keys.map((k,i)=>`<button class="key" data-k="${k}"><span class="k">${i+1}</span><span class="t">${hl(n.c[k][0])}</span></button>`).join("");
+    act.querySelectorAll(".key").forEach(b=> b.onclick = ()=> choose(b.dataset.k));
+    startTimer();
+  }
+  else if(S.phase==="over"){
+    const o = S.over;
+    renderWard(focus + mentioned(o.text + (o.choice||""))); setVitals(o.kind==="død"?0:140, S.stress, true, R.room, o.kind==="død" ? "Asystoli." : "Personalechefen vil tale med dig.");
+    card.innerHTML = `<span class="tag over">Game over · Kl. ${fmt(clockNow())}</span>
+      <div class="big-x">${o.kind==="død" ? "Patient død" : "Du er fyret"}</div>
+      ${o.choice ? `<p class="quote">Du valgte: ${hl(o.choice)}</p>` : ""}
+      <p class="lead">${hl(o.text)}</p>
+      <div class="q"><b>Hvem havde ansvaret for, at det gik galt?</b>${opts("ansvar", BLAME, S.pending&&S.pending.ansvar)}</div>
+      <p class="note">Du nåede runde ${r} af 5. Forsøg ${S.attempt}.</p>`;
+    bindOpts({set ansvar(v){ if(S.pending) S.pending.ansvar = v; }});
+    act.className = "actions two";
+    act.innerHTML = `<button class="key primary" id="again">Start forfra</button><button class="key ghost" id="np">Ny spiller</button>`;
+    $("again").onclick = ()=>{ flushPending(); S.attempt++; newGame(); goNode("R1"); };
+    $("np").onclick = newPlayer;
+    loadHS();
+  }
+  else if(S.phase==="feedback"){
+    renderWard(focus); setVitals(80+r*4, S.stress, false, R.room, "Træk vejret.");
+    const f = S.fb;
+    card.innerHTML = `<span class="tag feedback">Feedback</span>
+      <div class="meta">Kl. ${fmt(clockNow())} · ${S.node} · du valgte ${S.last.k}</div>
+      <p class="quote">${hl(n.c[S.last.k][0])}</p>
+      <h2>Det kom du videre med.</h2>
+      <p class="lead">${hl(n.fb)}</p>
+      <div class="qs">
+        <div class="q"><b>Hvor presset følte du dig?</b><span class="sc">1 = rolig · 5 = panik</span>${opts("stress",[1,2,3,4,5],f.stress)}</div>
+        <div class="q"><b>Hvor sikker var du på dit valg?</b><span class="sc">1 = gættede · 5 = helt sikker</span>${opts("sikkerhed",[1,2,3,4,5],f.sikkerhed)}</div>
+        <div class="q"><b>Hvad styrede dit valg?</b>${opts("styret",DRIVERS,f.styret)}</div>
+      </div>
+      <div class="err" id="qerr"></div>`;
+    bindOpts(S.fb);
+    act.className = "actions one";
+    act.innerHTML = `<button class="key primary" id="next">${r===5?"Afslut vagten":"Videre til næste runde"}</button>`;
+    $("next").onclick = rate;
+  }
+  else if(S.phase==="end"){
+    const a = [...S.path].filter(c=>c==="A").length, prof = PROFILES[a], e = S.end;
+    renderWard("JHAB"); setVitals(68, S.stress, false, "Omklædningsrummet", "Vagten er slut.");
+    card.innerHTML = `<span class="tag end">Vagten er slut · Kl. 15.00</span>
+      <div class="meta">Slutning ${S.path} · ${S.attempt} forsøg</div>
+      <h2>${prof}</h2>
+      <p class="lead">${hl(ENDINGS[S.path])}</p>
+      <div class="path" aria-label="Dine valg">${[...S.path].map(c=>`<span class="${c}">${c}</span>`).join("")}</div>
+      <p>Du valgte systemet (A) ${a} gange og genvejen (B) ${5-a} gange. Ingen profil er fejlfri. Hver vej har en pris, og det er designet af arbejdsgangene, der bestemmer prisen.</p>
+      ${S.saved ? `<p class="thanks">Tak for dine svar. De er gemt.</p>` : `<div class="qs">
+        <div class="q"><b>Hvilket dilemma var sværest?</b>${opts("svaerest",[1,2,3,4,5],e.svaerest,["Runde 1","Runde 2","Runde 3","Runde 4","Runde 5"])}</div>
+        <div class="q"><b>Har spillet ændret dit syn på plejepersonalets ansvar?</b><span class="sc">1 = slet ikke · 5 = meget</span>${opts("synsaendring",[1,2,3,4,5],e.synsaendring)}</div>
+        <div class="q"><b>Overvejer du nu et job i plejen?</b>${opts("interesse_efter",["Ja","Måske","Nej"],e.interesse_efter)}</div>
+        <div class="field"><label for="surp">Hvad overraskede dig mest? <small>(frivilligt)</small></label><textarea id="surp" maxlength="300">${esc(e.overrasket||"")}</textarea></div>
+      </div><div class="err" id="qerr"></div>`}`;
+    if(!S.saved) bindOpts(S.end);
+    act.className = "actions two";
+    act.innerHTML = S.saved ? `<button class="key primary" id="again">Tag en ny vagt</button><button class="key ghost" id="np">Ny spiller</button>`
+      : `<button class="key primary" id="send">Gem mine svar</button><button class="key ghost" id="np">Ny spiller</button>`;
+    if(S.saved) $("again").onclick = ()=>{ S.attempt=1; S.saved=false; newGame(); S.node=null; S.phase="start"; render(); };
+    else $("send").onclick = ()=>{
+      const m = [["svaerest","sværeste dilemma"],["synsaendring","syn på ansvar"],["interesse_efter","job i plejen"]].filter(([k])=>!S.end[k]);
+      if(m.length){ $("qerr").textContent = "Svar på: " + m.map(x=>x[1]).join(", ") + "."; return; }
+      S.end.overrasket = $("surp").value.trim();
+      Data.save("Slutninger",{player, nick:profile.nick, game:S.game, attempt:S.attempt, path:S.path, profile:prof, svaerest:+S.end.svaerest, synsaendring:+S.end.synsaendring, interesse_efter:S.end.interesse_efter, overrasket:S.end.overrasket, ts:new Date().toISOString()});
+      S.saved = true; loadHS(); render();
+    };
+    $("np").onclick = ()=>{ S.saved=false; newPlayer(); };
+  }
+  renderSide();
+}
+
+/* Skift til en ny node og vis dens info-kort. */
+function goNode(id){ S.node = id; S.phase = "info"; S.fb = {}; render(); window.scrollTo({top:0,behavior:"smooth"}); }
+
+/* [K15] NEDTÆLLINGEN. Måler svartid i millisekunder og hæver pulsen, jo mindre tid der er
+   tilbage. Når tiden er gået, kaldes choose("timeout") = game over ("så døde baby"). */
+function startTimer(){
+  S.t0 = performance.now();
+  const tm = $("timer"), bar = $("timerBar"); tm.classList.add("on"); tm.classList.remove("low");
+  const r = roundOf(S.node), base = 95 + r*6;
+  const tick = now=>{
+    const left = Math.max(0, 1 - (now-S.t0)/(SECONDS*1000));
+    bar.style.transform = `scaleX(${left})`;
+    tm.classList.toggle("low", left < .34);
+    S.hr = base + (1-left)*45; $("hr").textContent = Math.round(S.hr);
+    if(left<.34) $("monitor").classList.add("alarm");
+    if(left<=0){ choose("timeout"); return; }
+    S.raf = requestAnimationFrame(tick);
+  };
+  S.raf = requestAnimationFrame(tick);
+}
+
+/* [K16] row() bygger én datarække (én beslutning). choose() håndterer et valg:
+   timeout og X1/X2 = game over, A/B = videre til feedback. Svartiden (ms) måles her. */
+function row(r,k,out,ms){ return {player, nick:profile?profile.nick:"", game:S.game, attempt:S.attempt, node:S.node, round:r, choice:k, outcome:out, ms, stress:"", sikkerhed:"", styret:"", ansvar:"", ts:new Date().toISOString()}; }
+function choose(k){
+  if(S.phase!=="stress") return;
+  stopTimer();
+  const ms = Math.round(performance.now()-S.t0), n = N[S.node], r = roundOf(S.node);
+  if(k==="timeout"){
+    S.stress = Math.min(99, S.stress+15);
+    S.pending = row(r,"timeout","død",ms);
+    S.over = {kind:"død", choice:"", text:"Du nåede det ikke. Så døde baby."}; S.phase="over"; render(); return;
+  }
+  if(k==="X1"||k==="X2"){
+    const [txt,out,kind] = n.c[k];
+    S.stress = Math.min(99, S.stress+12);
+    S.pending = row(r,k,kind,ms);
+    S.over = {kind, choice:txt, text:out}; S.phase="over"; render(); return;
+  }
+  S.path += k; S.last = {k, row:row(r,k,"videre",ms)};
+  S.stress = Math.min(99, S.stress + Math.max(2, Math.round(ms/1000)));
+  S.phase="feedback"; render();
+}
+
+/* [K17] rate() kontrollerer at de tre spørgsmål er besvaret, gemmer rækken og går til
+   næste node (R{runde+1}-{vej}) eller til slutskærmen efter runde 5. */
+function rate(){
+  if(S.phase!=="feedback") return;
+  const m = [["stress","pres"],["sikkerhed","sikkerhed"],["styret","hvad der styrede dit valg"]].filter(([k])=>!S.fb[k]);
+  if(m.length){ $("qerr").textContent = "Svar på: " + m.map(x=>x[1]).join(", ") + "."; return; }
+  S.phase="rated";
+  Object.assign(S.last.row, {stress:+S.fb.stress, sikkerhed:+S.fb.sikkerhed, styret:S.fb.styret});
+  Data.save("Valg", S.last.row);
+  S.stress = Math.min(99, S.stress + S.fb.stress*2);
+  const r = roundOf(S.node);
+  if(r===5){ S.saved=false; S.end={}; S.phase="end"; render(); return; }
+  goNode(`R${r+1}-${S.path}`);
+}
+
+/* [K18] SMÅ HÆNDELSER: mus over et patientnavn lyser stuen op, klik på kaldenavnet
+   skifter profil, tasterne 1-4 vælger svar. Til sidst: første render og top 5 hvert minut. */
+document.addEventListener("mouseover", e=>{
+  const p = e.target.closest && e.target.closest(".pt");
+  document.querySelectorAll(".bed.hot").forEach(b=>b.classList.remove("hot"));
+  if(p){ const b = document.querySelector(`.bed[data-p="${p.dataset.p}"]`); b && b.classList.add("hot"); }
+});
+$("chipWho").onclick = ()=>{ if(["start","end","over","profile"].includes(S.phase)){ flushPending(); S.phase="profile"; render(); } };
+addEventListener("keydown", e=>{
+  if(S.phase==="stress" && /^[1-4]$/.test(e.key)){ const b = $("actions").querySelectorAll(".key")[+e.key-1]; b && b.click(); }
+});
+render();
+loadHS(); setInterval(loadHS, 60000);
+</script>

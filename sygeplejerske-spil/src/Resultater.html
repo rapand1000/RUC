@@ -1,0 +1,240 @@
+<!--
+================================================================================
+  EN VAGT SOM SYGEPLEJERSKE · Resultater.html  (resultatsiden)
+--------------------------------------------------------------------------------
+  Viser, hvad spillerne har valgt og oplevet. Siden er kun tilgængelig med den
+  hemmelige nøgle i linket (tjekkes både i doGet og getData i Code.gs).
+  Data hentes fra Sheetet hvert 15. sekund, og alle beregninger (gennemsnit,
+  fordelinger, grupperinger) laves her i browseren.
+     [R1]-[R10] henviser til docs/kodeguide.md.
+================================================================================
+-->
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&family=Barlow+Condensed:wght@500;600;700&family=JetBrains+Mono:wght@500;700&display=swap">
+<style>
+/* Layout: kontrolrum. Nøgletal øverst, sammenligninger i midten, én række pr. spiller nederst. */
+:root{
+  --bg:#E9EFF0; --surface:#FFFFFF; --ink:#14232A; --muted:#55686F; --line:#CCD8DB;
+  --accent:#0D6B68; --accent-soft:#D6EBE9; --alarm:#C2302A; --alarm-soft:#F8DEDB; --warn:#9A6200; --warn-soft:#F6E7C8;
+  --display:"Barlow Condensed","Arial Narrow",system-ui,sans-serif;
+  --body:"Atkinson Hyperlegible",system-ui,-apple-system,"Segoe UI",sans-serif;
+  --mono:"JetBrains Mono",ui-monospace,Menlo,Consolas,monospace;
+}
+@media (prefers-color-scheme: dark){:root{
+  --bg:#0E1619; --surface:#16232A; --ink:#E3ECEE; --muted:#93A6AC; --line:#2A3B41;
+  --accent:#3FB7AF; --accent-soft:#163A39; --alarm:#FF6B60; --alarm-soft:#3A1A19; --warn:#E3A93A; --warn-soft:#3A2C12; color-scheme:dark}}
+html,body{background:var(--bg);color:var(--ink);margin:0}
+body{font-family:var(--body);font-size:15px;line-height:1.5;padding:16px max(16px,env(safe-area-inset-left,0px)) 32px}
+.wrap{max-width:1200px;margin:0 auto;display:flex;flex-direction:column;gap:14px}
+h1,h2{font-family:var(--display);font-weight:700;margin:0;line-height:1.05}
+h1{font-size:clamp(26px,4vw,36px)} h2{font-size:22px}
+.top{display:flex;flex-wrap:wrap;justify-content:space-between;align-items:flex-end;gap:12px}
+.muted{color:var(--muted);font-size:13px}
+.panel{background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:18px;display:flex;flex-direction:column;gap:10px;min-width:0}
+.grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(min(100%,320px),1fr));gap:14px}
+.kpis{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:10px 12px}
+.kpi b{display:block;font-family:var(--display);font-size:34px;line-height:1.1;font-variant-numeric:tabular-nums}
+.kpi span{font-size:13px;color:var(--muted)}
+.qr{display:flex;gap:16px;align-items:center;flex-wrap:wrap}
+#qrbox{background:#fff;padding:10px;border-radius:8px;line-height:0}
+.url{font-family:var(--mono);font-size:12px;word-break:break-all;user-select:all;max-width:46ch}
+.bar-row{display:grid;grid-template-columns:96px minmax(0,1fr) 64px;gap:10px;align-items:center}
+.lbl{font-family:var(--mono);font-size:13px}
+.val{font-family:var(--mono);font-size:13px;text-align:right;font-variant-numeric:tabular-nums}
+.sub{margin:-6px 0 2px 106px;font-size:12px;color:var(--muted)}
+.bar{height:16px;border-radius:4px;background:var(--line);overflow:hidden;display:flex}
+.bar .a{background:var(--accent)} .bar .b{background:var(--warn)} .bar .x{background:var(--alarm)}
+.bar .c1{background:var(--accent)} .bar .c2{background:var(--warn)} .bar .c3{background:#7F77DD} .bar .c4{background:#B4B2A9}
+.surp{margin:0;padding-left:18px;display:grid;gap:6px}
+.surp li span{color:var(--muted);font-size:12px}
+.legend{display:flex;gap:14px;flex-wrap:wrap;font-size:13px;color:var(--muted)}
+.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.tbl{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:14px}
+th,td{text-align:left;padding:8px 10px;border-bottom:1px solid var(--line);vertical-align:top}
+th{font-family:var(--display);font-size:15px;font-weight:600;letter-spacing:.03em;white-space:nowrap;cursor:pointer}
+td.n{font-family:var(--mono);text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap}
+tr.p:hover td{background:var(--accent-soft);cursor:pointer}
+tr.d td{background:var(--bg);font-size:13px}
+.pill{font-family:var(--mono);font-size:12px;padding:2px 7px;border-radius:999px;white-space:nowrap}
+.pill.ok{background:var(--accent-soft);color:var(--accent)} .pill.x{background:var(--alarm-soft);color:var(--alarm)} .pill.b{background:var(--warn-soft);color:var(--warn)}
+.steps{display:flex;flex-wrap:wrap;gap:6px}
+.empty{color:var(--muted)}
+button{font:inherit;color:inherit;background:var(--surface);border:1px solid var(--line);border-radius:8px;padding:6px 12px;cursor:pointer}
+</style>
+
+<div class="wrap">
+  <div class="top">
+    <div><h1>Resultater · En vagt som sygeplejerske</h1><div class="muted" id="upd">Henter data …</div></div>
+    <button id="reload">Opdatér nu</button>
+  </div>
+  <div class="panel">
+    <div class="kpis" id="kpis"></div>
+    <div class="qr"><div id="qrbox"></div><div><b>Scan for at spille</b><div class="url">%%GAME_URL%%</div></div></div>
+  </div>
+  <div class="grid">
+    <div class="panel"><h2>System eller genvej pr. runde</h2>
+      <div class="legend"><span><i style="background:var(--accent)"></i>A: systemet</span><span><i style="background:var(--warn)"></i>B: genvejen</span><span><i style="background:var(--alarm)"></i>Game over</span></div>
+      <div id="rounds"></div></div>
+    <div class="panel"><h2>Efter baggrund</h2><div id="bybg"></div></div>
+    <div class="panel"><h2>Her døde flest</h2><div id="deaths"></div></div>
+    <div class="panel"><h2>Profiler</h2><div id="profiles"></div></div>
+  </div>
+  <div class="panel"><h2>Beslutningsoplevelse pr. runde</h2>
+    <p class="muted">Hurtig og usikker = svar på under 5 sekunder med sikkerhed 1-2.</p>
+    <div class="tbl"><table><thead><tr><th>Runde</th><th>Valg</th><th>Gns. stress</th><th>Gns. sikkerhed</th><th>Hurtig og usikker</th><th>Oftest styret af</th></tr></thead><tbody id="dec"></tbody></table></div>
+    <div class="legend"><span><i style="background:var(--accent)"></i>Patientens sikkerhed</span><span><i style="background:var(--warn)"></i>Tiden</span><span><i style="background:#7F77DD"></i>Reglerne</span><span><i style="background:#B4B2A9"></i>Mavefornemmelse</span></div>
+    <div id="drivers"></div></div>
+  <div class="grid">
+    <div class="panel"><h2>Hvem fik skylden ved game over</h2><div id="blame"></div></div>
+    <div class="panel"><h2>Job i plejen: før og efter</h2><p class="muted">Kun spillere, der har gennemført vagten og svaret.</p><div id="prepost"></div></div>
+    <div class="panel"><h2>Sværeste dilemma</h2><div id="hard"></div><div id="view" class="muted"></div></div>
+    <div class="panel"><h2>Efter erfaring fra pleje</h2><div id="byexp"></div></div>
+  </div>
+  <div class="panel"><h2>Hvad overraskede dem</h2><ul class="surp" id="surp"></ul></div>
+  <div class="panel"><h2>Pr. spiller</h2><p class="muted">Tryk på en række for at se spillerens valg. Tryk på en kolonne for at sortere.</p>
+    <div class="tbl"><table><thead><tr id="thead"></tr></thead><tbody id="players"></tbody></table></div></div>
+</div>
+
+<!-- QR-kodebiblioteket (qrcodejs) tegner QR-koden til spillet øverst på siden. -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/qrcodejs/1.0.0/qrcode.min.js"></script>
+<script>
+/* [R1] KONSTANTER OG HJÆLPERE. %%KEY%% og %%GAME_URL%% erstattes af serveren (Code.gs [G2]).
+   avg = gennemsnit, f1 = ét decimal med komma, pct = procent. */
+const KEY = "%%KEY%%";
+const NODE_TITLES = {};
+const PROFILES = ["Systemets mester","Regelrytteren","Balancegangeren","Praktikeren","Genvejsmesteren","Hjertet før skærmen"];
+const $ = id => document.getElementById(id);
+const esc = s => String(s==null?"":s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const avg = a => a.length ? a.reduce((s,x)=>s+x,0)/a.length : null;
+const f1 = x => x==null ? "–" : x.toFixed(1).replace(".",",");
+const pct = (a,b) => b ? Math.round(a/b*100) : 0;
+let DATA = null, open = new Set(), sortKey = "valg", sortDir = -1;
+
+try{ new QRCode($("qrbox"),{text:"%%GAME_URL%%",width:140,height:140,colorDark:"#14232A",colorLight:"#ffffff"}); }catch(e){}
+
+/* [R2] HENT DATA fra serveren (getData i Code.gs [G6]) og tegn siden igen hvert 15. sekund. */
+function load(){
+  $("upd").textContent = "Henter data …";
+  google.script.run.withSuccessHandler(d=>{ DATA=d; render(); $("upd").textContent = "Opdateret kl. " + new Date().toLocaleTimeString("da-DK",{hour:"2-digit",minute:"2-digit",second:"2-digit"}) + " · opdaterer selv hvert 15. sekund"; })
+    .withFailureHandler(e=>{ $("upd").textContent = "Kunne ikke hente data: " + e.message; }).getData(KEY);
+}
+$("reload").onclick = load;
+load(); setInterval(load, 15000);
+
+/* [R3] SAML PR. SPILLER. Kobler profilen (fanen Spillere) med alle spillerens valg
+   (Valg) og slutsvar (Slutninger) via det anonyme spiller-ID, og beregner
+   gennemsnit for svartid, stress og sikkerhed, andel A-valg, hvad der oftest
+   styrede valgene og interesse for job i plejen før og efter. */
+function players(){
+  const prof = {}; DATA.Spillere.forEach(p=> prof[p.player] = p);
+  const ids = new Set([...DATA.Spillere.map(p=>p.player), ...DATA.Valg.map(v=>v.player)]);
+  return [...ids].filter(Boolean).map(id=>{
+    const v = DATA.Valg.filter(x=>x.player===id), e = DATA.Slutninger.filter(x=>x.player===id), p = prof[id] || {nick:(v[0]||{}).nick||id};
+    const ab = v.filter(x=>x.choice==="A"||x.choice==="B");
+    const st = v.map(x=>+x.stress).filter(x=>x>0);
+    const best = Math.max(0,...v.map(x=>+x.round||0));
+    const sk = v.map(x=>+x.sikkerhed).filter(x=>x>0), dc = {}; v.forEach(x=>{ if(x.styret) dc[x.styret]=(dc[x.styret]||0)+1; });
+    const top = Object.entries(dc).sort((a,b)=>b[1]-a[1])[0];
+    const last = e.length ? e[e.length-1] : null;
+    return {id, nick:p.nick, age:p.age||"", bg:p.bg||"", desc:p.desc||"", erf:p.erfaring||"", sikkerhed:avg(sk), styret: top?top[0]:"",
+      intf:p.interesse_foer||"", inte:last&&last.interesse_efter||"",
+      forsoeg: Math.max(0,...v.map(x=>+x.attempt||0)), valg:v.length,
+      svartid: avg(v.map(x=>+x.ms/1000)), stress: avg(st),
+      over: v.filter(x=>x.outcome!=="videre").length, timeout: v.filter(x=>x.choice==="timeout").length,
+      andelA: ab.length ? ab.filter(x=>x.choice==="A").length/ab.length : null,
+      runde: best, slut: e.length ? e[e.length-1] : null, rows: v};
+  });
+}
+
+/* [R4] TEGN SIDEN. Hver blok nedenfor fylder én sektion på resultatsiden. */
+function render(){
+  const V = DATA.Valg, E = DATA.Slutninger, P = players();
+  const deaths = V.filter(v=>v.outcome!=="videre");
+  $("kpis").innerHTML = [
+    [P.length,"spillere"],[V.length,"beslutninger"],[f1(avg(V.map(v=>+v.ms/1000)))+" s","gns. svartid"],
+    [f1(avg(V.map(v=>+v.stress).filter(x=>x>0))),"gns. stress (1-5)"],[deaths.length,"game over"],
+    [V.filter(v=>v.choice==="timeout").length,"løb tør for tid"],[E.length,"klarede vagten"]
+  ].map(([b,s])=>`<div class="kpi"><b>${b}</b><span>${s}</span></div>`).join("");
+
+  /* [R5] System (A) eller genvej (B) pr. runde, med svartid og stress. */
+  let rh = "";
+  for(let r=1;r<=5;r++){
+    const x = V.filter(v=>+v.round===r), t = x.length, a = x.filter(v=>v.choice==="A").length, b = x.filter(v=>v.choice==="B").length, d = t-a-b;
+    rh += `<div class="bar-row"><span class="lbl">Runde ${r}</span><div class="bar"><i class="a" style="width:${pct(a,t)}%"></i><i class="b" style="width:${pct(b,t)}%"></i><i class="x" style="width:${pct(d,t)}%"></i></div><span class="val">${t}</span></div>
+      <div class="sub">Svartid ${f1(avg(x.map(v=>+v.ms/1000)))} s · stress ${f1(avg(x.map(v=>+v.stress).filter(s=>s>0)))}</div>`;
+  }
+  $("rounds").innerHTML = V.length ? rh : `<p class="empty">Ingen valg endnu. Scan QR-koden og spil en runde.</p>`;
+
+  /* [R6] Sammenligning efter baggrund. */
+  const groups = {}; P.forEach(p=>{ const g = p.bg || "Ikke angivet"; (groups[g]=groups[g]||[]).push(p); });
+  $("bybg").innerHTML = P.length ? `<div class="tbl"><table><thead><tr><th>Baggrund</th><th>Spillere</th><th>Svartid</th><th>Stress</th><th>Andel A</th></tr></thead><tbody>${
+    Object.entries(groups).map(([g,ps])=>{ const rows = ps.flatMap(p=>p.rows), ab = rows.filter(v=>v.choice==="A"||v.choice==="B");
+      return `<tr><td>${esc(g)}</td><td class="n">${ps.length}</td><td class="n">${f1(avg(rows.map(v=>+v.ms/1000)))} s</td><td class="n">${f1(avg(rows.map(v=>+v.stress).filter(s=>s>0)))}</td><td class="n">${ab.length?pct(ab.filter(v=>v.choice==="A").length,ab.length)+" %":"–"}</td></tr>`; }).join("")
+  }</tbody></table></div>` : `<p class="empty">Ingen spillere endnu.</p>`;
+
+  /* [R7] Hvor døde flest (game over pr. node) og fordeling af slutprofiler. */
+  const by = {}; deaths.forEach(d=> by[d.node]=(by[d.node]||0)+1);
+  const top = Object.entries(by).sort((a,b)=>b[1]-a[1]).slice(0,8), mx = top.length ? top[0][1] : 1;
+  $("deaths").innerHTML = top.length ? top.map(([k,v])=>`<div class="bar-row"><span class="lbl">${esc(k)}</span><div class="bar"><i class="x" style="width:${v/mx*100}%"></i></div><span class="val">${v}</span></div>`).join("") : `<p class="empty">Ingen er døde endnu.</p>`;
+
+  const pc = {}; E.forEach(e=> pc[e.profile]=(pc[e.profile]||0)+1); const pm = Math.max(1,...Object.values(pc));
+  $("profiles").innerHTML = E.length ? PROFILES.map(p=>`<div class="bar-row" style="grid-template-columns:150px minmax(0,1fr) 40px"><span>${p}</span><div class="bar"><i class="a" style="width:${(pc[p]||0)/pm*100}%"></i></div><span class="val">${pc[p]||0}</span></div>`).join("") : `<p class="empty">Ingen har gennemført vagten endnu.</p>`;
+
+  /* [R8] BESLUTNINGSOPLEVELSE pr. runde: stress, sikkerhed, "hurtig og usikker"
+     (under 5 sek. og sikkerhed 1-2) og hvad der styrede valget. */
+  const DR = ["Patientens sikkerhed","Tiden","Reglerne","Mavefornemmelse"];
+  let dh = "", drh = "";
+  for(let r=1;r<=5;r++){
+    const x = V.filter(v=>+v.round===r && v.outcome==="videre" && v.sikkerhed!==""), all = V.filter(v=>+v.round===r);
+    const st = x.map(v=>+v.stress).filter(s=>s>0), sk = x.map(v=>+v.sikkerhed).filter(s=>s>0);
+    const fu = x.filter(v=>+v.ms<5000 && +v.sikkerhed>0 && +v.sikkerhed<=2).length;
+    const cnt = DR.map(d=>x.filter(v=>v.styret===d).length), tot = cnt.reduce((a,b)=>a+b,0);
+    const mi = tot ? cnt.indexOf(Math.max(...cnt)) : -1;
+    dh += `<tr><td>Runde ${r}</td><td class="n">${all.length}</td><td class="n">${f1(avg(st))}</td><td class="n">${f1(avg(sk))}</td><td class="n">${x.length?fu+" ("+pct(fu,x.length)+" %)":"–"}</td><td>${mi<0?"–":esc(DR[mi])+" ("+pct(cnt[mi],tot)+" %)"}</td></tr>`;
+    drh += `<div class="bar-row"><span class="lbl">Runde ${r}</span><div class="bar">${cnt.map((c,i)=>`<i class="c${i+1}" style="width:${pct(c,tot)}%"></i>`).join("")}</div><span class="val">${tot}</span></div>`;
+  }
+  $("dec").innerHTML = dh; $("drivers").innerHTML = drh;
+  /* [R9] Hvem fik skylden, job i plejen før/efter, sværeste dilemma, syn på ansvar,
+     opdeling efter erfaring og fritekst om hvad der overraskede. */
+  const bars = (pairs, cls) => { const mx = Math.max(1,...pairs.map(p=>p[1])); return pairs.map(([k,v])=>`<div class="bar-row" style="grid-template-columns:110px minmax(0,1fr) 40px"><span>${esc(k)}</span><div class="bar"><i class="${cls}" style="width:${v/mx*100}%"></i></div><span class="val">${v}</span></div>`).join(""); };
+  const bl = ["Mig","Kollegaen","Systemet","Ledelsen"].map(k=>[k, V.filter(v=>v.ansvar===k).length]);
+  $("blame").innerHTML = bl.some(b=>b[1]) ? bars(bl,"x") : `<p class="empty">Ingen svar endnu.</p>`;
+  const prof = {}; DATA.Spillere.forEach(p=> prof[p.player]=p);
+  const done = E.filter(e=>e.interesse_efter);
+  if(done.length){
+    let ph = `<div class="tbl"><table><thead><tr><th></th><th>Ja</th><th>Måske</th><th>Nej</th></tr></thead><tbody>`;
+    const cnt = (arr) => ["Ja","Måske","Nej"].map(k=>arr.filter(x=>x===k).length);
+    const before = cnt(done.map(e=>(prof[e.player]||{}).interesse_foer)), after = cnt(done.map(e=>e.interesse_efter));
+    ph += `<tr><td>Før</td>${before.map(n=>`<td class="n">${n}</td>`).join("")}</tr><tr><td>Efter</td>${after.map(n=>`<td class="n">${n}</td>`).join("")}</tr></tbody></table></div>`;
+    const up = done.filter(e=>{ const o={"Nej":0,"Måske":1,"Ja":2}; const b=(prof[e.player]||{}).interesse_foer; return b in o && o[e.interesse_efter]>o[b]; }).length;
+    ph += `<p class="muted">${up} af ${done.length} blev mere interesserede efter spillet.</p>`;
+    $("prepost").innerHTML = ph;
+  } else $("prepost").innerHTML = `<p class="empty">Ingen har svaret endnu.</p>`;
+  const hd = [1,2,3,4,5].map(r=>["Runde "+r, E.filter(e=>+e.svaerest===r).length]);
+  $("hard").innerHTML = hd.some(x=>x[1]) ? bars(hd,"a") : `<p class="empty">Ingen svar endnu.</p>`;
+  const sv = E.map(e=>+e.synsaendring).filter(x=>x>0);
+  $("view").textContent = sv.length ? `Syn på plejepersonalets ansvar ændret: gennemsnit ${f1(avg(sv))} af 5 (${sv.length} svar).` : "";
+  const eg = {}; P.forEach(p=>{ const g = p.erf || "Ikke angivet"; (eg[g]=eg[g]||[]).push(p); });
+  $("byexp").innerHTML = P.length ? `<div class="tbl"><table><thead><tr><th>Erfaring</th><th>Spillere</th><th>Stress</th><th>Sikkerhed</th><th>Andel A</th><th>Game over</th></tr></thead><tbody>${
+    Object.entries(eg).map(([g,ps])=>{ const rows = ps.flatMap(p=>p.rows), ab = rows.filter(v=>v.choice==="A"||v.choice==="B");
+      return `<tr><td>${esc(g)}</td><td class="n">${ps.length}</td><td class="n">${f1(avg(rows.map(v=>+v.stress).filter(s=>s>0)))}</td><td class="n">${f1(avg(rows.map(v=>+v.sikkerhed).filter(s=>s>0)))}</td><td class="n">${ab.length?pct(ab.filter(v=>v.choice==="A").length,ab.length)+" %":"–"}</td><td class="n">${rows.filter(v=>v.outcome!=="videre").length}</td></tr>`; }).join("")
+  }</tbody></table></div>` : `<p class="empty">Ingen spillere endnu.</p>`;
+  const su = E.filter(e=>e.overrasket);
+  $("surp").innerHTML = su.length ? su.slice(-30).reverse().map(e=>`<li>${esc(e.overrasket)} <span>– ${esc(e.nick)}</span></li>`).join("") : `<li class="empty" style="list-style:none">Ingen svar endnu.</li>`;
+
+  /* [R10] TABEL PR. SPILLER. Klik på kolonne = sortér, klik på række = vis alle valg. */
+  const cols = [["nick","Kaldenavn"],["age","Alder"],["bg","Baggrund"],["forsoeg","Forsøg"],["valg","Valg"],["svartid","Gns. svartid"],["stress","Gns. stress"],["over","Game over"],["timeout","Tid løbet ud"],["andelA","Andel A"],["sikkerhed","Gns. sikkerhed"],["styret","Styret mest af"],["erf","Erfaring"],["intf","Job i plejen før → efter"],["runde","Nået"]];
+  $("thead").innerHTML = cols.map(([k,l])=>`<th data-k="${k}">${l}${sortKey===k?(sortDir<0?" ↓":" ↑"):""}</th>`).join("");
+  $("thead").querySelectorAll("th").forEach(th=> th.onclick = ()=>{ const k=th.dataset.k; sortDir = sortKey===k ? -sortDir : -1; sortKey=k; render(); });
+  P.sort((a,b)=>{ const x=a[sortKey], y=b[sortKey]; if(x==null) return 1; if(y==null) return -1; return (x>y?1:x<y?-1:0)*sortDir; });
+  $("players").innerHTML = P.length ? P.map(p=>{
+    const main = `<tr class="p" data-id="${esc(p.id)}"><td><b>${esc(p.nick)}</b>${p.desc?`<div class="muted">${esc(p.desc)}</div>`:""}</td><td>${esc(p.age)}</td><td>${esc(p.bg)}</td>
+      <td class="n">${p.forsoeg}</td><td class="n">${p.valg}</td><td class="n">${f1(p.svartid)} s</td><td class="n">${f1(p.stress)}</td><td class="n">${p.over}</td><td class="n">${p.timeout}</td>
+      <td class="n">${p.andelA==null?"–":Math.round(p.andelA*100)+" %"}</td><td class="n">${f1(p.sikkerhed)}</td><td>${esc(p.styret)||"–"}</td><td>${esc(p.erf)||"–"}</td><td>${p.intf||p.inte?esc(p.intf||"?")+" → "+esc(p.inte||"?"):"–"}</td><td>${p.slut?`<span class="pill ok">${esc(p.slut.profile)}</span>`:p.runde?`Runde ${p.runde}`:"–"}</td></tr>`;
+    const det = open.has(p.id) ? `<tr class="d"><td colspan="15"><div class="steps">${p.rows.map(v=>`<span class="pill ${v.outcome!=="videre"?"x":v.choice==="B"?"b":"ok"}">F${v.attempt} · ${esc(v.node)} · ${esc(v.choice)} · ${f1(+v.ms/1000)} s${v.stress?` · stress ${v.stress}`:""}${v.sikkerhed?` · sikker ${v.sikkerhed}`:""}${v.styret?` · ${esc(v.styret)}`:""}${v.ansvar?` · skyld: ${esc(v.ansvar)}`:""}</span>`).join("")}</div></td></tr>` : "";
+    return main + det;
+  }).join("") : `<tr><td colspan="15" class="empty">Ingen spillere endnu.</td></tr>`;
+  $("players").querySelectorAll("tr.p").forEach(tr=> tr.onclick = ()=>{ const id = tr.dataset.id; open.has(id)?open.delete(id):open.add(id); render(); });
+}
+</script>
